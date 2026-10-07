@@ -1,0 +1,61 @@
+# Ruler Configuration — docdiff
+# See https://ai.intellectronica.net/ruler for documentation.
+#
+# This project uses Ruler to maintain a single source of truth for AI agent
+# instructions. Agent-specific config files and native skills are generated
+# from this source by `scripts/apply-ruler.sh`.
+#
+# To update agent instructions:
+#   1. Edit files in .ruler/ (AGENTS.md, skills/)
+#   2. Run: scripts/apply-ruler.sh
+#   3. Commit the generated files
+
+# Agents actively used in this project
+default_agents = ["claude", "agentsmd", "kiro", "codex"]
+
+# Skills: propagate .ruler/skills/ to agents with native skills support
+[skills]
+enabled = true
+
+# Generated files are committed, so gitignore managed block not needed
+[gitignore]
+enabled = false
+
+# No .bak files — generated files are always overwritten from source
+[backup]
+enabled = false
+
+# --- Agent Configuration ---
+
+# Claude Code: reads CLAUDE.md + .claude/skills/
+[agents.claude]
+enabled = true
+
+# Kiro: reads AGENTS.md + .kiro/skills/
+[agents.kiro]
+enabled = true
+
+# Root AGENTS.md for Codex and other generic agents
+[agents.agentsmd]
+enabled = true
+
+# OpenAI Codex: reads AGENTS.md + .agents/skills/
+[agents.codex]
+enabled = true
+
+# --- Disabled Agents ---
+
+[agents.amazonqcli]
+enabled = false
+
+[agents.copilot]
+enabled = false
+
+[agents.cursor]
+enabled = false
+
+[agents.windsurf]
+enabled = false
+
+[agents.aider]
+enabled = false
