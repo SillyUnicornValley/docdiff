@@ -19,6 +19,8 @@ export interface ParsedDocx {
   pkg: DocxPackage;
   /** Revisions accepted on load (for the new file: "N pending revisions will be accepted on export"). */
   revisionCount: number;
+  /** Fields and content controls spanning several blocks or rows (see BodyResult.groups). */
+  groups: Map<NodeId, string[]>;
 }
 
 const VARIANTS: HeaderVariant[] = ['default', 'first', 'even'];
@@ -161,6 +163,6 @@ export async function parseDocx(data: ArrayBuffer, side: Side, fileName: string)
     },
     commentCount: comments.size,
   };
-  return { doc, source: r.source, xml, pkg, revisionCount: revisionTotal(revisions) };
+  return { doc, source: r.source, xml, pkg, revisionCount: revisionTotal(revisions), groups: r.groups };
 }
 

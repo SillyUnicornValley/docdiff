@@ -123,8 +123,8 @@ export function SelectScreen({
             {canResume ? 'Back to comparison' : 'Compare'}
           </button>
           <span className="muted">
-            Preview build: your files are read for real, but only identical paragraphs and tables are aligned — anything changed appears as deleted and inserted.
-            Word-level comparison comes next.
+            Preview build: paragraphs and tables are compared word by word. Placeholders, comments and the scope options are still being finished, so some of
+            these may not be detected yet.
           </span>
         </div>
 

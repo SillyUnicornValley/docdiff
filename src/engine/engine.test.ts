@@ -65,6 +65,14 @@ describe('engine specifics', () => {
     expect(r.scope.pendingRevisionsInNew).toBeGreaterThan(0);
   });
 
+  it('05: sections are paired by shared content; the new appendix section is only in new', async () => {
+    const r = (await run('05-uncompared-and-comments')).result;
+    expect(r.scope.sectionHints.map((h) => `${h.part}:${h.oldSection ?? '-'}:${h.newSection ?? '-'}:${h.result}`)).toEqual([
+      'header:1:1:mayDiffer',
+      'header:-:2:onlyNew',
+    ]);
+  });
+
   it('05: lists detected-only parts in the check scope', async () => {
     const r = (await run('05-uncompared-and-comments')).result;
     const els = r.scope.items.map((i) => i.element);

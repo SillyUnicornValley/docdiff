@@ -47,6 +47,13 @@ export interface BodyResult {
   sectionBreaks: { blockId: NodeId; sectPr: Element }[];
   hyperlinkTargets: string[];
   textBoxTexts: string[];
+  /**
+   * Structures spanning several blocks or rows: id → group names. "field:N" for a
+   * field whose result spans paragraphs, "cc:N" for a content control around
+   * several blocks or rows. A difference covering only part of a group cannot
+   * "Use old" (spec §7.6).
+   */
+  groups: Map<NodeId, string[]>;
 }
 
 interface FieldFrame {
@@ -54,6 +61,7 @@ interface FieldFrame {
   phase: 'instr' | 'result';
   kind?: 'toc' | 'hyperlink' | 'field';
   result: TextInline[];
+  group: string;
 }
 
 const FIELD_TYPES: Record<string, FieldType> = {
@@ -110,9 +118,16 @@ export class BodyReader {
   private endnoteNo = 0;
   private commentsSeen = new Set<string>();
   private out: Inline[] = [];
-  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [] };
+  private groupNo = 0;
+  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map() };
 
   constructor(private ctx: BodyContext) {}
+
+  private addGroup(id: NodeId, group: string) {
+    const g = this.result.groups.get(id);
+    if (!g) this.result.groups.set(id, [group]);
+    else if (!g.includes(group)) g.push(group);
+  }
 
   private id(prefix = '') {
     return `${this.ctx.side === 'old' ? 'o' : 'n'}${prefix}${++this.n}`;
@@ -138,7 +153,12 @@ export class BodyReader {
           blocks.push(this.table(c));
         } else if (isW(c, 'sdt')) {
           const content = wChild(c, 'sdtContent');
+          const start = blocks.length;
           if (content) visit(content);
+          if (blocks.length - start > 1) {
+            const group = `cc:${++this.groupNo}`;
+            for (const b of blocks.slice(start)) this.addGroup(b.id, group);
+          }
         } else if (isW(c, 'customXml') || isW(c, 'smartTag')) visit(c);
         else if (isW(c, 'altChunk')) {
           const b: PlaceholderBlock = { kind: 'placeholder', id: this.id(), element: 'object', label: 'Embedded document' };
@@ -208,7 +228,11 @@ export class BodyReader {
     const block: ParagraphBlock = { kind: 'paragraph', id: this.id(), role, content: [] };
     if (numbering) block.numbering = numbering;
     this.out = block.content;
+    const spanning = () => (this.fields[0] && this.fields[0].kind !== 'toc' && fieldKeyword(this.fields[0].instr) !== 'TOC' ? this.fields[0].group : undefined);
+    const atStart = spanning();
     this.inlines(p, {});
+    // A field still open at either end of the paragraph spans paragraphs.
+    for (const g of [atStart, spanning()]) if (g) this.addGroup(block.id, g);
     // A field that continues into the next paragraph: close what it showed here.
     const outer = this.fields[0];
     if (outer && outer.phase === 'result' && outer.kind !== 'toc' && outer.result.length) {
@@ -244,7 +268,7 @@ export class BodyReader {
   }
 
   private fieldChar(type: string | null) {
-    if (type === 'begin') this.fields.push({ instr: '', phase: 'instr', result: [] });
+    if (type === 'begin') this.fields.push({ instr: '', phase: 'instr', result: [], group: `field:${++this.groupNo}` });
     else if (type === 'separate') {
       const f = this.fields.at(-1);
       if (!f) return;
@@ -486,6 +510,13 @@ export class BodyReader {
         isW(c, 'tr') ? [c] : isW(c, 'sdt') ? rows(wChild(c, 'sdtContent') ?? c) : isW(c, 'customXml') ? rows(c) : [],
       );
     for (const tr of rows(tbl)) t.rows.push(this.row(tr));
+    // A content control around several rows (e.g. a repeating section).
+    for (const sdt of elementChildren(tbl).filter((c) => isW(c, 'sdt'))) {
+      const trs = new Set(rows(sdt));
+      if (trs.size < 2) continue;
+      const group = `cc:${++this.groupNo}`;
+      for (const r of t.rows) if (trs.has(this.result.source.get(r.id)!)) this.addGroup(r.id, group);
+    }
     if (!t.gridColumns) t.gridColumns = Math.max(0, ...t.rows.map((r) => r.cells.reduce((k, c) => k + c.gridSpan, 0)));
     return t;
   }

@@ -18,12 +18,13 @@ import type {
 import { forEachParagraph } from '../../model/docIndex';
 import { flattenParagraph } from '../../model/flatten';
 import { computeScope } from '../../model/scope';
-import { computeUseOld } from '../../model/useOld';
+import { computeUseOld, useOldBlocked } from '../../model/useOld';
 import { alignBlocks, alignRows, rowKey, type AlignOp } from '../align/alignBlocks';
 import { diffKeys } from '../align/myers';
 import { hashString } from '../hash';
 import { blockKey, optionalDifference } from './keys';
 import { detectedOnlyRows } from './scopeRows';
+import { sectionHints } from './sections';
 import { commonCategory, fullSpan, similarity, wordDiff } from './wordDiff';
 
 export const ENGINE_VERSION = 'engine-3';
@@ -295,9 +296,41 @@ function orderOf(segments: Segment[]): string[] {
   return order;
 }
 
-export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: number): DiffResult {
+/** Fields / content controls spanning several blocks or rows, per side (from the reader). */
+export interface Groups {
+  old: Map<string, string[]>;
+  new: Map<string, string[]>;
+}
+
+/**
+ * "Use old" is not available when a difference covers only part of a field or
+ * content control that spans several blocks or rows (spec §7.6): replacing
+ * part of it would break the structure.
+ */
+function applyBoundaries(differences: Record<string, Difference>, groups: Groups) {
+  const members = (m: Map<string, string[]>) => {
+    const out = new Map<string, Set<string>>();
+    for (const [id, gs] of m) for (const g of gs) (out.get(g) ?? out.set(g, new Set()).get(g)!).add(id);
+    return out;
+  };
+  const all = { old: members(groups.old), new: members(groups.new) };
+  for (const d of Object.values(differences)) {
+    if (d.informational) continue;
+    for (const side of ['old', 'new'] as const) {
+      const ids = new Set(d[side].ids);
+      const broken = [...ids].flatMap((id) => groups[side].get(id) ?? []).find((g) => [...all[side].get(g)!].some((m) => !ids.has(m)));
+      if (broken) {
+        d.useOld = useOldBlocked(broken.startsWith('field:') ? 'fieldBoundary' : 'contentControlBoundary');
+        break;
+      }
+    }
+  }
+}
+
+export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: number, groups?: Groups): DiffResult {
   const c = new Comparer();
   const segments = c.container(o.blocks, n.blocks, true);
+  if (groups) applyBoundaries(c.differences, groups);
   return {
     engineVersion: ENGINE_VERSION,
     old: o,
@@ -306,6 +339,6 @@ export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: num
     differences: c.differences,
     order: orderOf(segments),
     sections: c.sections,
-    scope: computeScope(o, n, { extraScope: detectedOnlyRows(o, n), pendingRevisionsInNew }),
+    scope: computeScope(o, n, { extraScope: detectedOnlyRows(o, n), pendingRevisionsInNew, sectionHints: sectionHints(o, n, segments, c.differences) }),
   };
 }

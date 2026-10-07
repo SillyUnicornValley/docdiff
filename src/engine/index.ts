@@ -45,7 +45,7 @@ export async function compareFiles(oldFile: InputFile, newFile: InputFile, onSte
   const n = await parseNamed(newFile, 'new');
   onStep(2);
   await yieldToUi();
-  const result = compareDocs(o.doc, n.doc, n.revisionCount);
+  const result = compareDocs(o.doc, n.doc, n.revisionCount, { old: o.groups, new: n.groups });
   onStep(3);
   await yieldToUi();
   return { result, parsed: { old: o, new: n } };
