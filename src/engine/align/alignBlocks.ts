@@ -12,7 +12,7 @@ import type { Block, ParagraphBlock, TableRow } from '../../model/document';
 import { forEachParagraph } from '../../model/docIndex';
 import { flattenParagraph } from '../../model/flatten';
 import { blockKey } from '../compare/keys';
-import { similarity, wordCount } from '../compare/wordDiff';
+import { concatSig, sigSimilarity, wordCount, wordSig, type WordSig } from '../compare/wordDiff';
 import { diffKeys } from './myers';
 
 export type AlignOp<T> =
@@ -32,8 +32,10 @@ export const SPLIT_JOIN_MIN = 0.8;
 export const TABLE_PAIR_MIN = 0.3;
 export const MOVE_MIN = 0.8;
 export const MOVE_MIN_WORDS = 5;
-/** Larger gaps are not paired (two unrelated documents): everything is deleted / inserted. */
+/** Gaps up to this many cells are paired with the full table; larger ones within a diagonal band. */
 const MAX_GAP_CELLS = 40_000;
+const BAND_MIN = 60;
+const MAX_BAND_CELLS = 600_000;
 const MAX_SPLIT = 3;
 
 /** What the generic aligner needs to know about a kind of unit. */
@@ -41,8 +43,8 @@ interface UnitSpec<T> {
   key(u: T): string;
   /** Paragraphs the unit contributes to similarity. */
   paras(us: T[]): ParagraphBlock[];
-  /** Similarity of two runs; defaults to word similarity of their paragraphs. */
-  similarity?(os: T[], ns: T[]): number;
+  /** Similarity of two runs; defaults to word similarity of their paragraphs. Below `min` an upper bound is enough. */
+  similarity?(os: T[], ns: T[], min: number): number;
   /** Can these runs (1:1, or 1:k / k:1) be paired, and with which minimum similarity? */
   pairRule(os: T[], ns: T[]): number | undefined;
   /** Paragraph that may take part in a move (blocks only). */
@@ -97,13 +99,24 @@ const rowParas = (rs: TableRow[]) => parasOf(rs.flatMap((r) => r.cells.flatMap((
 
 const cellKey = (c: TableRow['cells'][number]) => c.blocks.map(blockKey).join('\u0003');
 
+/** Word signature of one unit (cached) or of a run of units. */
+const unitSigCache = new WeakMap<object, WordSig>();
+function sigOf<T>(spec: UnitSpec<T>, us: T[]): WordSig {
+  const one = (u: T) => {
+    let sig = unitSigCache.get(u as object);
+    if (!sig) unitSigCache.set(u as object, (sig = wordSig(spec.paras([u]))));
+    return sig;
+  };
+  return us.length === 1 ? one(us[0]) : concatSig(us.map(one));
+}
+
 /**
  * Rows are short, so word similarity alone is too strict ("Creatinine | mg/dL" vs
  * "Creatinine | umol/L" shares 1 of 3 words). Also count identical cells, if at
  * least one of them has text.
  */
 function rowSimilarity(os: TableRow[], ns: TableRow[]): number {
-  const words = similarity(rowParas(os), rowParas(ns));
+  const words = sigSimilarity(sigOf(ROWS, os), sigOf(ROWS, ns));
   if (os.length !== 1 || ns.length !== 1 || os[0].cells.length !== ns[0].cells.length) return words;
   const [a, b] = [os[0].cells, ns[0].cells];
   let same = 0;
@@ -182,61 +195,77 @@ function exactOps<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   return ops;
 }
 
-const simOf = <T>(spec: UnitSpec<T>, os: T[], ns: T[]) => (spec.similarity ? spec.similarity(os, ns) : similarity(spec.paras(os), spec.paras(ns)));
+const simOf = <T>(spec: UnitSpec<T>, os: T[], ns: T[], min = 0) =>
+  spec.similarity ? spec.similarity(os, ns, min) : sigSimilarity(sigOf(spec, os), sigOf(spec, ns), min);
 
-/** Step 3: order-preserving pairing inside one gap by dynamic programming. */
+/**
+ * Step 3: order-preserving pairing inside one gap by dynamic programming.
+ * Small gaps use the full table. Large gaps (e.g. a term replaced in every
+ * paragraph, so nothing is identical) only search a band around the diagonal:
+ * document order is mostly kept, so pairs lie near it.
+ */
 function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   const n = O.length;
   const m = N.length;
-  const unpaired = (): AlignOp<T>[] => [...O.map((o): AlignOp<T> => ({ type: 'del', o })), ...N.map((x): AlignOp<T> => ({ type: 'ins', n: x }))];
-  if (n === 0 || m === 0 || n * m > MAX_GAP_CELLS) return unpaired();
+  if (n === 0 || m === 0) return [...O.map((o): AlignOp<T> => ({ type: 'del', o })), ...N.map((x): AlignOp<T> => ({ type: 'ins', n: x }))];
 
-  const len = (us: T[]) => wordCount(spec.paras(us)) + 1;
+  const len = (us: T[]) => us.reduce((k, u) => k + sigOf(spec, [u]).seq.length, 0) + 1;
   const keys = { o: O.map(spec.key), n: N.map(spec.key) };
-  const simCache = new Map<string, number>();
-  const sim = (i0: number, i1: number, j0: number, j1: number) => {
-    const k = `${i0},${i1},${j0},${j1}`;
-    let s = simCache.get(k);
-    if (s === undefined) simCache.set(k, (s = simOf(spec, O.slice(i0, i1), N.slice(j0, j1))));
-    return s;
-  };
+  // Each (run, run) is evaluated once per cell, so no cache is needed; `min` lets most pairs stop early.
+  const sim = (i0: number, i1: number, j0: number, j1: number, min = 0) => simOf(spec, O.slice(i0, i1), N.slice(j0, j1), min);
 
-  // score[i][j]: best total for O[0..i) vs N[0..j). Matched content scores sim × size.
-  const W = m + 1;
-  const score = new Float64Array((n + 1) * W);
-  const back = new Int32Array((n + 1) * W); // encoded step: 0 del, 1 ins, 2 equal, 100·ko + kn for a match
-  for (let i = 0; i <= n; i++)
-    for (let j = 0; j <= m; j++) {
+  // Band half-width: the whole table when small enough, else around the diagonal.
+  const B = (n + 1) * (m + 1) <= MAX_GAP_CELLS ? Math.max(n, m) : Math.max(BAND_MIN, Math.min(Math.abs(n - m) + BAND_MIN, Math.floor(MAX_BAND_CELLS / (2 * (n + 1)))));
+  const Wb = 2 * B + 1;
+  const centre = (i: number) => Math.round((i * m) / n);
+  const at = (i: number, j: number) => {
+    const off = j - centre(i) + B;
+    return off < 0 || off >= Wb ? -1 : i * Wb + off;
+  };
+  // score(i, j): best total for O[0..i) vs N[0..j). Matched content scores sim × size.
+  const score = new Float64Array((n + 1) * Wb).fill(-Infinity);
+  const back = new Int32Array((n + 1) * Wb); // encoded step: 0 del, 1 ins, 2 equal, 100·ko + kn for a match
+  const get = (i: number, j: number) => {
+    const k = at(i, j);
+    return k < 0 ? -Infinity : score[k];
+  };
+  score[at(0, 0)] = 0;
+  for (let i = 0; i <= n; i++) {
+    const c = centre(i);
+    for (let j = Math.max(0, c - B); j <= Math.min(m, c + B); j++) {
       if (i === 0 && j === 0) continue;
-      let best = -1;
+      let best = -Infinity;
       let step = 0;
-      if (i > 0 && score[(i - 1) * W + j] > best) (best = score[(i - 1) * W + j]), (step = 0);
-      if (j > 0 && score[i * W + j - 1] > best) (best = score[i * W + j - 1]), (step = 1);
+      if (i > 0 && get(i - 1, j) > best) (best = get(i - 1, j)), (step = 0);
+      if (j > 0 && get(i, j - 1) > best) (best = get(i, j - 1)), (step = 1);
       // Identical weak units (e.g. empty paragraphs) folded into the gap: keep them aligned when it costs nothing.
-      if (i > 0 && j > 0 && keys.o[i - 1] === keys.n[j - 1] && score[(i - 1) * W + j - 1] + 0.01 > best) (best = score[(i - 1) * W + j - 1] + 0.01), (step = 2);
+      if (i > 0 && j > 0 && keys.o[i - 1] === keys.n[j - 1] && get(i - 1, j - 1) + 0.01 > best) (best = get(i - 1, j - 1) + 0.01), (step = 2);
       if (i > 0 && j > 0) {
         for (let ko = 1; ko <= Math.min(MAX_SPLIT, i); ko++)
           for (let kn = 1; kn <= Math.min(MAX_SPLIT, j); kn++) {
             if (ko > 1 && kn > 1) continue; // splits and joins only, not n:m
+            const prev = get(i - ko, j - kn);
+            if (prev === -Infinity) continue;
             const os = O.slice(i - ko, i);
             const ns = N.slice(j - kn, j);
             const min = spec.pairRule(os, ns);
             if (min === undefined) continue;
-            const s = sim(i - ko, i, j - kn, j);
+            const s = sim(i - ko, i, j - kn, j, min);
             if (s < min) continue;
-            const v = score[(i - ko) * W + j - kn] + s * (len(os) + len(ns));
+            const v = prev + s * (len(os) + len(ns));
             if (v > best) (best = v), (step = 100 * ko + kn);
           }
       }
-      score[i * W + j] = best;
-      back[i * W + j] = step;
+      score[at(i, j)] = best;
+      back[at(i, j)] = step;
     }
+  }
 
   const rev: AlignOp<T>[] = [];
   let i = n;
   let j = m;
   while (i > 0 || j > 0) {
-    const step = back[i * W + j];
+    const step = back[at(i, j)];
     if (step === 0) rev.push({ type: 'del', o: O[--i] });
     else if (step === 1) rev.push({ type: 'ins', n: N[--j] });
     else if (step === 2) rev.push({ type: 'equal', o: O[--i], n: N[--j] });
@@ -304,7 +333,7 @@ function alignUnits<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
     if (dels.length * inss.length <= MAX_GAP_CELLS)
       for (const d of dels)
         for (const i of inss) {
-          const s = similarity(spec.paras([(ops[d] as { o: T }).o]), spec.paras([(ops[i] as { n: T }).n]));
+          const s = simOf(spec, [(ops[d] as { o: T }).o], [(ops[i] as { n: T }).n], MOVE_MIN);
           if (s >= MOVE_MIN) candidates.push({ d, i, s });
         }
     candidates.sort((x, y) => y.s - x.s);

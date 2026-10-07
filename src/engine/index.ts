@@ -1,8 +1,11 @@
 // Engine entry point: two .docx files → DiffResult.
-// Tables are compared row by row from M3; the comparison moves into a Web Worker in M5.
+// Parsing runs on the main thread; the comparison runs in a Web Worker when
+// the browser allows one, otherwise on the main thread.
 
 import type { DiffResult } from '../model/diff';
-import { compareDocs } from './compare/compare';
+import { compareDocs, type Groups } from './compare/compare';
+import type { CompareRequest } from './compare.worker';
+import CompareWorker from './compare.worker?worker&inline';
 import { parseDocx, type ParsedDocx } from './docx/parseDocx';
 import { DocxError } from './docx/xml';
 
@@ -32,6 +35,39 @@ async function parseNamed(f: InputFile, side: 'old' | 'new'): Promise<ParsedDocx
   }
 }
 
+/**
+ * Compare in a Web Worker (inlined as a blob URL so the single-file build and
+ * file:// keep working). Any failure to start or run the worker falls back to
+ * the main thread, e.g. where a security policy blocks blob workers.
+ */
+async function compareInWorker(req: CompareRequest): Promise<DiffResult> {
+  const fallback = () => compareDocs(req.old, req.new, req.pendingRevisionsInNew, req.groups);
+  let worker: Worker;
+  try {
+    worker = new CompareWorker();
+  } catch {
+    return fallback();
+  }
+  return new Promise<DiffResult>((resolve, reject) => {
+    worker.onmessage = (e: MessageEvent<{ ok: true; result: DiffResult } | { ok: false; message: string }>) => {
+      worker.terminate();
+      if (e.data.ok) resolve(e.data.result);
+      else reject(new Error(e.data.message));
+    };
+    worker.onerror = (e) => {
+      e.preventDefault();
+      worker.terminate();
+      // The worker could not load or crashed outside compareDocs: compare here instead.
+      try {
+        resolve(fallback());
+      } catch (err) {
+        reject(err);
+      }
+    };
+    worker.postMessage(req);
+  });
+}
+
 /** Let the browser paint the progress dialog between steps. */
 const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -45,7 +81,8 @@ export async function compareFiles(oldFile: InputFile, newFile: InputFile, onSte
   const n = await parseNamed(newFile, 'new');
   onStep(2);
   await yieldToUi();
-  const result = compareDocs(o.doc, n.doc, n.revisionCount, { old: o.groups, new: n.groups });
+  const groups: Groups = { old: o.groups, new: n.groups };
+  const result = await compareInWorker({ old: o.doc, new: n.doc, pendingRevisionsInNew: n.revisionCount, groups });
   onStep(3);
   await yieldToUi();
   return { result, parsed: { old: o, new: n } };

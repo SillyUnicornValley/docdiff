@@ -71,36 +71,99 @@ export function tokenize(blocks: ParagraphBlock[]): Token[] {
 /** Word count (letters/digits tokens) of paragraphs. */
 export function wordCount(blocks: ParagraphBlock[]): number {
   let n = 0;
-  for (const b of blocks) for (const t of paragraphTokens(b)) if (t.word) n++;
+  for (const b of blocks) n += wordSig([b]).seq.length;
   return n;
 }
 
-const wordKeys = (blocks: ParagraphBlock[]) => {
-  const out: string[] = [];
-  for (const b of blocks) for (const t of paragraphTokens(b)) if (t.word) out.push(t.key.toLowerCase());
-  return out;
+// ---------------------------------------------------------------------------
+// Similarity (used thousands of times while pairing: kept allocation-free)
+// ---------------------------------------------------------------------------
+
+/** Words of a run of paragraphs as interned ids: in order, and sorted. */
+export interface WordSig {
+  seq: Int32Array;
+  sorted: Int32Array;
+}
+
+const intern = new Map<string, number>();
+const idOf = (k: string) => {
+  let id = intern.get(k);
+  if (id === undefined) intern.set(k, (id = intern.size));
+  return id;
 };
+const sigCache = new WeakMap<ParagraphBlock, WordSig>();
+
+/** Case-insensitive word ids; whitespace and punctuation are ignored. */
+export function wordSig(blocks: ParagraphBlock[]): WordSig {
+  if (blocks.length === 1) {
+    const hit = sigCache.get(blocks[0]);
+    if (hit) return hit;
+    const ids: number[] = [];
+    for (const t of paragraphTokens(blocks[0])) if (t.word) ids.push(idOf(t.text.toLowerCase() + t.key.slice(t.key.indexOf('|'))));
+    const sig = { seq: Int32Array.from(ids), sorted: Int32Array.from(ids).sort() };
+    sigCache.set(blocks[0], sig);
+    return sig;
+  }
+  return concatSig(blocks.map((b) => wordSig([b])));
+}
+
+export function concatSig(sigs: WordSig[]): WordSig {
+  if (sigs.length === 1) return sigs[0];
+  const total = sigs.reduce((k, s) => k + s.seq.length, 0);
+  const seq = new Int32Array(total);
+  let o = 0;
+  for (const s of sigs) seq.set(s.seq, (o += s.seq.length) - s.seq.length);
+  return { seq, sorted: seq.slice().sort() };
+}
+
+/** Words shared regardless of order (multiset intersection of sorted ids). */
+function sharedCount(a: Int32Array, b: Int32Array): number {
+  let i = 0;
+  let j = 0;
+  let n = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) n++, i++, j++;
+    else if (a[i] < b[j]) i++;
+    else j++;
+  }
+  return n;
+}
+
+const lcsRow = { prev: new Int32Array(0), cur: new Int32Array(0) };
+
+/** Length of the longest common subsequence (rolling-row dynamic programming). */
+function lcsLength(a: Int32Array, b: Int32Array): number {
+  if (a.length < b.length) [a, b] = [b, a];
+  if (lcsRow.prev.length <= b.length) lcsRow.prev = new Int32Array(b.length + 1);
+  if (lcsRow.cur.length <= b.length) lcsRow.cur = new Int32Array(b.length + 1);
+  let prev = lcsRow.prev.fill(0, 0, b.length + 1);
+  let cur = lcsRow.cur;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = 0;
+    const ai = a[i - 1];
+    for (let j = 1; j <= b.length; j++) cur[j] = ai === b[j - 1] ? prev[j - 1] + 1 : cur[j - 1] > prev[j] ? cur[j - 1] : prev[j];
+    [prev, cur] = [cur, prev];
+  }
+  lcsRow.prev = prev;
+  lcsRow.cur = cur;
+  return prev[b.length];
+}
 
 /**
- * Similarity of two runs of paragraphs, 0..1: 2·(common words in order) / (words in both).
- * Case-insensitive, punctuation and whitespace ignored.
+ * Similarity 0..1: 2·(common words in order) / (words in both). Below `min`
+ * only an upper bound is returned (enough for the caller to reject the pair).
  */
-export function similarity(a: ParagraphBlock[], b: ParagraphBlock[]): number {
-  const x = wordKeys(a);
-  const y = wordKeys(b);
-  if (x.length + y.length === 0) return 0;
-  // Cheap upper bound first: shared words regardless of order.
-  const counts = new Map<string, number>();
-  for (const k of x) counts.set(k, (counts.get(k) ?? 0) + 1);
-  let shared = 0;
-  for (const k of y) {
-    const c = counts.get(k);
-    if (c) shared++, counts.set(k, c - 1);
-  }
-  const bound = (2 * shared) / (x.length + y.length);
-  if (bound < 0.3) return bound;
-  const eq = diffKeys(x, y).filter((o) => o.type === 'equal').length;
-  return (2 * eq) / (x.length + y.length);
+export function sigSimilarity(x: WordSig, y: WordSig, min = 0): number {
+  const total = x.seq.length + y.seq.length;
+  if (total === 0) return 0;
+  const bound = (2 * sharedCount(x.sorted, y.sorted)) / total;
+  if (bound < min || bound === 0) return bound;
+  return (2 * lcsLength(x.seq, y.seq)) / total;
+}
+
+/** Similarity of two runs of paragraphs (see sigSimilarity). */
+export function similarity(a: ParagraphBlock[], b: ParagraphBlock[], min = 0): number {
+  return sigSimilarity(wordSig(a), wordSig(b), min);
 }
 
 function spansOf(tokens: Token[]): TextSpan[] {
