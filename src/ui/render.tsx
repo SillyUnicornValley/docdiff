@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Block, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, TableBlock, TableCell, TableRow } from '../model/document';
 import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
-import { flattenParagraph, type Piece } from '../model/flatten';
+import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { Choice } from '../model/review';
 import { isHidden, type Indexes, type Visibility } from './rows';
 
@@ -84,7 +84,7 @@ function PlaceholderChip({ p, mayDiffer }: { p: InlinePlaceholder; mayDiffer?: b
   );
 }
 
-function renderPiece(piece: Piece, text: string, key: string, compareFields: boolean, cls: string, mayDiffer?: boolean): ReactNode {
+function renderPiece(piece: Piece, text: string, key: string, cls: string, mayDiffer?: boolean): ReactNode {
   let node: ReactNode;
   if (piece.kind === 'placeholder') node = <PlaceholderChip key={key} p={piece.placeholder!} mayDiffer={mayDiffer} />;
   else if (piece.kind === 'tab') node = <span key={key} className="tab">{'\t'}</span>;
@@ -101,27 +101,6 @@ function renderPiece(piece: Piece, text: string, key: string, compareFields: boo
           {node}
         </span>
       );
-    if (piece.wrap?.type === 'hyperlink')
-      node = (
-        <span className="hyperlink" title="Hyperlink — display text compared; address detected only">
-          {node}
-        </span>
-      );
-    if (piece.wrap?.type === 'field') {
-      const ref = piece.wrap.fieldType === 'REF' || piece.wrap.fieldType === 'PAGEREF';
-      node = (
-        <span
-          className={ref ? 'field field-ref' : `field${compareFields ? '' : ' field-nc'}`}
-          title={
-            ref
-              ? 'Cross-reference field — the displayed result is compared'
-              : `${piece.wrap.fieldType} field — ${compareFields ? 'compared (info only)' : 'shown, not compared. Turn on "Compare fields" in View options.'}`
-          }
-        >
-          {node}
-        </span>
-      );
-    }
   }
   if (cls) {
     return (
@@ -131,6 +110,28 @@ function renderPiece(piece: Piece, text: string, key: string, compareFields: boo
     );
   }
   return <span key={key}>{node}</span>;
+}
+
+function WrapView({ wrap, compareFields, children }: { wrap: PieceWrap; compareFields: boolean; children: ReactNode }) {
+  if (wrap.type === 'hyperlink')
+    return (
+      <span className="hyperlink" title="Hyperlink — display text compared; address detected only">
+        {children}
+      </span>
+    );
+  const ref = wrap.fieldType === 'REF' || wrap.fieldType === 'PAGEREF';
+  return (
+    <span
+      className={ref ? 'field field-ref' : `field${compareFields ? '' : ' field-nc'}`}
+      title={
+        ref
+          ? `Cross-reference field (${wrap.instruction}) — the displayed result is compared`
+          : `${wrap.fieldType} field — ${compareFields ? 'compared (info only)' : 'shown, not compared. Turn on "Compare fields" in View options.'}`
+      }
+    >
+      {children}
+    </span>
+  );
 }
 
 function placeholderFingerprints(p?: ParagraphBlock) {
@@ -145,7 +146,13 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
   const out: ReactNode[] = [];
   const marks = (hl ?? []).filter((h) => h.end > h.start);
   const zero = (hl ?? []).filter((h) => h.end === h.start);
+  // Pieces of one hyperlink / field are grouped into a single wrapper.
+  const groups: { wrap?: PieceWrap; src: number; nodes: ReactNode[] }[] = [];
   for (const piece of pieces) {
+    const nodes: ReactNode[] = [];
+    const last = groups.at(-1);
+    if (piece.wrap && last?.wrap && last.src === piece.src) last.nodes.push(nodes);
+    else groups.push({ wrap: piece.wrap, src: piece.src, nodes: [nodes] });
     const pEnd = piece.start + piece.text.length;
     const cuts = new Set<number>([piece.start, pEnd]);
     for (const h of marks) {
@@ -163,9 +170,10 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
       const a = pts[i];
       const b = pts[i + 1];
       const h = marks.find((x) => x.start <= a && x.end >= b);
-      out.push(renderPiece(piece, piece.text.slice(a - piece.start, b - piece.start), `${piece.start}:${a}`, vis.compareFields, h?.cls ?? '', mayDiffer));
+      nodes.push(renderPiece(piece, piece.text.slice(a - piece.start, b - piece.start), `${piece.start}:${a}`, h?.cls ?? '', mayDiffer));
     }
   }
+  for (const g of groups) out.push(g.wrap ? <WrapView key={`w${g.src}`} wrap={g.wrap} compareFields={vis.compareFields}>{g.nodes}</WrapView> : g.nodes);
   for (const z of zero)
     out.push(
       <span key={`z${z.start}`} className={`${z.cls} para-mark`} title="Paragraph break added or removed here">

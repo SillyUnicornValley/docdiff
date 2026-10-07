@@ -24,6 +24,8 @@ export interface Piece {
   marks?: RunMarks;
   placeholder?: InlinePlaceholder;
   wrap?: PieceWrap;
+  /** Index of the source inline (pieces of one hyperlink/field share it). */
+  src: number;
 }
 
 export interface Flattened {
@@ -34,11 +36,13 @@ export interface Flattened {
 export function flattenInlines(inlines: Inline[]): Flattened {
   const pieces: Piece[] = [];
   let pos = 0;
-  const push = (p: Omit<Piece, 'start'>) => {
-    pieces.push({ ...p, start: pos });
+  let src = 0;
+  const push = (p: Omit<Piece, 'start' | 'src'>) => {
+    pieces.push({ ...p, start: pos, src });
     pos += p.text.length;
   };
-  for (const inl of inlines) {
+  for (const [i, inl] of inlines.entries()) {
+    src = i;
     switch (inl.type) {
       case 'text':
         if (inl.text) push({ text: inl.text, kind: 'text', marks: inl.marks });

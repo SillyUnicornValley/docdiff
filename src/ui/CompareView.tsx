@@ -37,7 +37,9 @@ interface Actions {
   select: (id: DiffId) => void;
   jump: (id: DiffId, part?: 'from' | 'to') => void;
   expand: (runId: string) => void;
-  number: (id: DiffId) => number;
+  /** Leave "preview only" and show this difference in the compare view. */
+  reviewInCompare: (id: DiffId) => void;
+  number: (id: DiffId) => string;
 }
 const ActionsContext = createContext<Actions>(null as unknown as Actions);
 
@@ -76,7 +78,14 @@ export function CompareView({
     () => ({ hiddenCategories: opts.hiddenCategories, compareToc: opts.compareToc, compareFields: opts.compareFields }),
     [opts.hiddenCategories, opts.compareToc, opts.compareFields],
   );
-  const numberOf = useMemo(() => new Map(result.order.map((id, i) => [id, i + 1])), [result]);
+  // Reviewable differences are numbered 1..N; info-only ones (TOC, fields) i1, i2…
+  const numberOf = useMemo(() => {
+    const m = new Map<DiffId, string>();
+    let n = 0;
+    let k = 0;
+    for (const id of result.order) m.set(id, result.differences[id].informational ? `i${++k}` : String(++n));
+    return m;
+  }, [result]);
 
   const reviewable = useMemo(() => result.order.filter((id) => !result.differences[id].informational), [result]);
   const navOrder = useMemo(() => result.order.filter((id) => !isHidden(result.differences[id], vis)), [result, vis]);
@@ -238,7 +247,11 @@ export function CompareView({
     select: setCurrentId,
     jump: (id, part) => goTo(id, part),
     expand: (runId) => setExpanded((s) => new Set(s).add(runId)),
-    number: (id) => numberOf.get(id) ?? 0,
+    reviewInCompare: (id) => {
+      setCurrentId(id);
+      setOpts((o) => ({ ...o, preview: 'off' }));
+    },
+    number: (id) => numberOf.get(id) ?? '?',
   };
   const set = <K extends keyof ViewOptions>(k: K, v: ViewOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
   const unsupported = result.scope.unsupportedRevisions.length;
@@ -845,7 +858,7 @@ function SidePane({ rows, side, scrollerRef, topRowKey }: { rows: Row[]; side: '
           const c = row.kind === 'gap' ? null : sideContent(row, side, ctx);
           const ids = rowDiffIds(row).filter((id) => !isHidden(ctx.result.differences[id], ctx.vis));
           return (
-            <div key={it.key} data-index={it.index} ref={v.measureElement} className="vitem">
+            <div key={it.key} data-index={it.index} ref={v.measureElement} className="vitem" style={{ transform: `translateY(${it.start}px)` }}>
               {row.kind === 'gap' ? (
                 <GapRow row={row} />
               ) : (
@@ -889,7 +902,7 @@ function FinalOnlyList({ rows, scrollerRef }: { rows: Row[]; scrollerRef: Scroll
             const ids = rowDiffIds(row).filter((id) => !isHidden(ctx.result.differences[id], ctx.vis));
             const content = finalRowContent(row, ctx);
             return (
-              <div key={it.key} data-index={it.index} ref={v.measureElement} className="vitem">
+              <div key={it.key} data-index={it.index} ref={v.measureElement} className="vitem" style={{ transform: `translateY(${it.start}px)` }}>
                 {row.kind === 'gap' ? (
                   <GapRow row={row} />
                 ) : (
@@ -898,7 +911,7 @@ function FinalOnlyList({ rows, scrollerRef }: { rows: Row[]; scrollerRef: Scroll
                       {ids.map((id) => {
                         const st = statusOf({ state: { choices: ctx.choices }, history: { past: [], future: [] } }, id);
                         return (
-                          <button key={id} className={`fmark st-${st}`} title={`Difference #${a.number(id)} · ${STATUS_LABEL[st]} — click to review`} onClick={() => a.select(id)}>
+                          <button key={id} className={`fmark st-${st}`} title={`Difference #${a.number(id)} · ${STATUS_LABEL[st]} — click to review it side by side`} onClick={() => a.reviewInCompare(id)}>
                             #{a.number(id)} {st === 'old' ? 'old' : st === 'new' ? 'new' : '•'}
                           </button>
                         );

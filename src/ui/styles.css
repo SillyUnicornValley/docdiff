@@ -191,6 +191,20 @@ button {
 .topbar .spacer {
   flex: 1;
 }
+.topbar {
+  flex-wrap: nowrap;
+}
+.topbar > * {
+  flex-shrink: 0;
+}
+.topbar > .files {
+  flex-shrink: 1;
+  min-width: 0;
+}
+.files .file {
+  min-width: 40px;
+  flex-shrink: 1;
+}
 .tabs {
   display: inline-flex;
   border: 1px solid var(--line);
@@ -1010,7 +1024,6 @@ table.from-old-row td {
   background: #eef0f2;
   border-bottom: 1px dotted #8c959f;
   border-radius: 2px;
-  padding: 0 2px;
 }
 .field-nc {
   color: #57606a;

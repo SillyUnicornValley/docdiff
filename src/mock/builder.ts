@@ -302,7 +302,8 @@ interface Member {
   hunks: WordHunk[];
 }
 
-const paras = (bs: Block[]) => bs.filter((b): b is ParagraphBlock => b.kind === 'paragraph');
+const paras = (bs: Block[]): ParagraphBlock[] =>
+  bs.flatMap((b) => (b.kind === 'paragraph' ? [b] : b.kind === 'placeholder' && b.children ? b.children : []));
 const isEmptyPara = (b: Block) => b.kind === 'paragraph' && b.content.every((i) => i.type === 'text' && i.text === '');
 
 export class Container {

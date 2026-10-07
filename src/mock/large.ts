@@ -39,7 +39,9 @@ export function largeCase(): DiffResult {
   const para = () => {
     const k = 2 + Math.floor(rnd() * 3);
     const nums = Array.from({ length: k }, () => num());
-    return { nums, text: (ns: number[]) => ns.map((n) => sentence(n)).join(' ') };
+    // Pick the wording once, so text(changedNumbers) differs only in the numbers.
+    const parts = nums.map(() => [pick(SUBJECTS), pick(VERBS), pick(OBJECTS), pick(TAILS)]);
+    return { nums, text: (ns: number[]) => ns.map((n, i) => `${parts[i][0]} ${parts[i][1]} ${parts[i][2]} ${parts[i][3].replace('{n}', String(n))}.`).join(' ') };
   };
 
   const CH = 60;
