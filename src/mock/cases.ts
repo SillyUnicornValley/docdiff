@@ -1,7 +1,7 @@
 // Hand-built mock diffs mirroring testdocs/docs 01–06 (see testdocs/README.md).
 
 import type { DiffResult } from '../model/diff';
-import { br, Container, Empty, field, fn, H, hash, hidden, img, LI, link, P, PairBuilder, Placeholder, sup, Table, Title } from './builder';
+import { br, comment, Container, Empty, field, fn, H, hash, hidden, img, LI, link, P, PairBuilder, Placeholder, sup, Table, Title } from './builder';
 
 const TITLE = 'Clinical Study Protocol CX-201';
 
@@ -255,9 +255,16 @@ export function case05(): DiffResult {
     ]),
   );
   b.same(H(1, 'Treatment'));
-  b.modified(P('Treatment duration is 12 weeks.'), P('Treatment duration is 24 weeks.'), { summary: '12 → 24 (a new-file comment is anchored here)' });
-  b.same(P('The dose may be titrated once after Week 2.'));
-  b.inserted(P('Missed doses should not be replaced.'));
+  // Comments of the new file are shown as markers (decision A10); old-file comments are not shown.
+  b.modified(
+    P('Treatment duration is 12 weeks.'),
+    P(['Treatment duration is ', comment('Bob', '24 weeks agreed at the September meeting.'), '24 weeks.']),
+  );
+  b.sameContent(
+    P('The dose may be titrated once after Week 2.'),
+    P([comment('Bob', 'Please double-check the titration rule.'), 'The dose may be titrated once after Week 2.']),
+  );
+  b.inserted(P([comment('Bob', 'Comment on a newly added paragraph.'), 'Missed doses should not be replaced.']));
   b.same(H(1, 'Measurements'));
   // Footnote text differs (HEM-907 → HEM-907XL) but footnote text is "detected only": no diff here.
   b.same(P(['Blood pressure will be measured using a validated device.', fn(1, hash('HEM-907'))]));

@@ -65,8 +65,7 @@ export type InlinePlaceholderKind =
   | 'shape'
   | 'textBox'
   | 'equation'
-  | 'object'
-  | 'commentAnchor';
+  | 'object';
 
 /**
  * An element inside a paragraph that is shown but not compared (or, for
@@ -81,8 +80,21 @@ export interface InlinePlaceholder {
   fingerprint?: string;
 }
 
+/**
+ * Where a comment of the NEW file is anchored (decision A10: shown, not
+ * compared). Zero-width: it adds no characters to the flattened text, so it
+ * never creates a difference. Comments of the old file are not shown.
+ */
+export interface CommentInline {
+  type: 'comment';
+  author: string;
+  /** First words of the comment, for the tooltip. */
+  preview: string;
+}
+
 export type Inline =
   | TextInline
+  | CommentInline
   | TabInline
   | BreakInline
   | HyperlinkInline

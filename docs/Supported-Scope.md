@@ -80,7 +80,7 @@ If the **new** file contains pending tracked changes, they will be accepted in t
 | Text boxes | Shown, not compared | Placeholder; detected only. |
 | Equations | Shown, not compared | Placeholder. |
 | Embedded objects | Shown, not compared | Placeholder. |
-| Comments | Not compared | Comments in the new file are kept on export; comments in the old file are not imported. |
+| Comments | Not compared | Comments in the new file are marked where they are anchored, so you can see them before choosing; they are kept on export. Comments in the old file are not shown or imported. |
 | Document properties (title, author, …) | Detected only | |
 | Formatting: fonts, sizes, colours, bold, italic, spacing, styles, heading level, list type, table formatting | Not compared | Shown as "Formatting: not checked". Planned for a later version. |
 | Page setup and section layout | Not compared | Kept from the new file. |

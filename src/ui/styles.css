@@ -385,6 +385,19 @@ button {
 .view-menu {
   min-width: 320px;
 }
+.batch-menu {
+  min-width: 300px;
+  max-width: min(420px, calc(100vw - 32px));
+}
+.batch-select {
+  margin: 2px 8px 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  font: inherit;
+  max-width: calc(100% - 16px);
+}
 
 /* ---------------------------------------------------------------- columns */
 
@@ -1521,6 +1534,23 @@ table.from-old-row td {
   :root {
     --gutter: 132px;
   }
+}
+
+/* new-file comment anchors (shown, not compared) */
+.comment-mark {
+  display: inline-block;
+  margin: 0 3px;
+  padding: 0 5px;
+  border-radius: 3px 3px 3px 0;
+  background: #fff1c2;
+  border: 1px solid #d4a72c;
+  color: #7d4e00;
+  font: 600 10.5px/1.5 var(--ui-font);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.g-comment {
+  color: #7d4e00;
 }
 
 /* section header/footer markers */

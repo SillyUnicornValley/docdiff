@@ -2,7 +2,7 @@
 // with word-level highlights taken from the diff model.
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Block, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, TableBlock, TableCell, TableRow } from '../model/document';
+import type { Block, CommentInline, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, TableBlock, TableCell, TableRow } from '../model/document';
 import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { Choice } from '../model/review';
@@ -135,6 +135,27 @@ function WrapView({ wrap, compareFields, children }: { wrap: PieceWrap; compareF
   );
 }
 
+function CommentMark({ c }: { c: CommentInline }) {
+  return (
+    <span className="comment-mark" title={`Comment by ${c.author} in the new file: “${c.preview}”. Shown only, not compared. Comments in the new file are kept on export.`}>
+      Comment · {c.author}
+    </span>
+  );
+}
+
+/** Does the new side of this difference carry a comment of the new file? */
+export function hasNewComment(d: Difference, ix: Indexes): boolean {
+  if (d.new.unit !== 'block') return false;
+  let found = false;
+  const visit = (b: Block) => {
+    if (found) return;
+    if (b.kind === 'paragraph') found = b.content.some((i) => i.type === 'comment');
+    else if (b.kind === 'table') for (const r of b.rows) for (const c of r.cells) c.blocks.forEach(visit);
+  };
+  d.new.ids.forEach((id) => visit(ix.new.block(id)));
+  return found;
+}
+
 function placeholderFingerprints(p?: ParagraphBlock) {
   return p ? p.content.filter((i): i is InlinePlaceholder => i.type === 'placeholder').map((i) => i.fingerprint) : [];
 }
@@ -154,6 +175,10 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
     const last = groups.at(-1);
     if (piece.wrap && last?.wrap && last.src === piece.src) last.nodes.push(nodes);
     else groups.push({ wrap: piece.wrap, src: piece.src, nodes: [nodes] });
+    if (piece.kind === 'comment') {
+      nodes.push(<CommentMark key={`c${piece.start}:${piece.src}`} c={piece.comment!} />);
+      continue;
+    }
     const pEnd = piece.start + piece.text.length;
     const cuts = new Set<number>([piece.start, pEnd]);
     for (const h of marks) {

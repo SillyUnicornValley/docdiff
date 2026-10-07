@@ -64,6 +64,8 @@ export const ph = (kind: InlinePlaceholderKind, label: string, fingerprint?: str
   label,
   fingerprint,
 });
+/** Anchor of a comment in the NEW file (shown, not compared). */
+export const comment = (author: string, preview: string): Inline => ({ type: 'comment', author, preview });
 export const fn = (n: number, fingerprint?: string) => ph('footnoteRef', `Footnote ${n}`, fingerprint);
 export const img = (label: string, fingerprint?: string) => ph('image', label, fingerprint);
 export const link = (text: string, url: string): Inline => ({ type: 'hyperlink', content: [t(text)], urlFingerprint: hash(url) });
@@ -751,7 +753,7 @@ export class PairBuilder extends Container {
               if (i.kind === 'footnoteRef' || i.kind === 'endnoteRef') c.footnoteRefs++;
               else if (i.kind === 'textBox') c.textBoxes++;
               else if (i.kind === 'equation') c.equations++;
-              else if (i.kind !== 'commentAnchor') c.images++;
+              else c.images++;
             }
           }
         }

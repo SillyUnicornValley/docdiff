@@ -24,6 +24,7 @@ function tokenize(blocks: ParagraphBlock[]): Token[] {
       out.push({ key: '¶', text: '', blockId: prev.id, start: len, end: len, para: true });
     }
     for (const p of flattenParagraph(b).pieces) {
+      if (p.kind === 'comment') continue; // comments are not compared
       if (p.kind !== 'text') {
         const key = p.kind === 'placeholder' ? `PH:${p.placeholder!.kind}` : p.kind === 'break' ? '\n' : p.text;
         out.push({ key, text: p.text, blockId: b.id, start: p.start, end: p.start + p.text.length });

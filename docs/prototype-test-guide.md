@@ -91,7 +91,8 @@ npm run dev
 
 | # | 检查 | 应该看到 |
 |---|---|---|
-| 05.1 | 顶部说明栏 | 写有已有修订的说明；有 “⚠ 1 unsupported revision type(s)” 和 “4 not-compared part(s) may differ” 两个链接 |
+| 05.1 | 顶部说明栏 | 写有已有修订的说明；有 “⚠ 1 unsupported revision type(s)” 和 “6 not-compared part(s) may differ” 两个链接 |
+| 05.1b | Treatment 一节 | 新版中 `24 weeks` 前、titration 段开头、新增段 “Missed doses…” 开头各有一个黄色 “Comment · Bob” 标记；titration 段**不**算差异；#1 和 #2 的卡片注明 “Has a new-file comment” |
 | 05.2 | Version date | 日期显示为灰底域，带 “FIELD” 小标；默认**不**算差异 |
 | 05.3 | 目录 | 折叠显示 “Table of contents · 3 / 4 entries · not compared”，可点开查看 |
 | 05.4 | View → 勾选 Compare table of contents、Compare date, page and other fields | 目录和日期显示为差异 #i1、#i2，有高亮，但卡片写 “Info only · not choosable”，没有选择按钮，也不计入进度 |
@@ -136,7 +137,7 @@ npm run dev
 |---|---|---|
 | G.1 | 导航按钮 ↑ Prev、↓ Next、⇣ Next unreviewed | 跳到上一处、下一处、下一处未处理；工具栏显示 “Difference a of b” |
 | G.2 | 快捷键 `J`/`K`/`U`/`1`/`2`/`Ctrl+Z`/`Ctrl+Shift+Z` | 同上；`1` 和 `2` 对当前差异采用旧版、新版 |
-| G.3 | Batch → All in this section → Use old | 当前差异所在一级标题下的所有差异采用旧版；不可采用旧版的被跳过，并提示数量 |
+| G.3 | Batch → 下拉框选一节 → All in this section → Use old | 下拉框默认是当前差异所在的节，并显示每节的差异数、未处理数；所选节的差异全部采用旧版，不可采用旧版的被跳过并提示数量 |
 | G.4 | View → 取消 Sync scroll | 两栏各自滚动、不插空白；差异按钮出现在内容上方。重新勾选后回到对齐视图，位置大致保持 |
 | G.5 | Final result: **Preview only** | 单栏显示最终文档；左侧标出每处差异的编号及选择；采用旧版的内容为琥珀色并标 “FROM OLD”；点左侧编号回到对照视图中的该差异 |
 | G.6 | Formatting 标签 | 只显示说明 “Formatting: not checked”，不会出现“无格式差异” |

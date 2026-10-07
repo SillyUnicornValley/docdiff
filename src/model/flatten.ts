@@ -4,6 +4,7 @@
 //   hyperlink / field -> their visible text, placeholder -> U+FFFC
 
 import type {
+  CommentInline,
   FieldType,
   Inline,
   InlinePlaceholder,
@@ -20,9 +21,11 @@ export type PieceWrap =
 export interface Piece {
   start: number;
   text: string;
-  kind: 'text' | 'tab' | 'break' | 'placeholder';
+  /** 'comment' pieces are zero-width anchors (text is ''). */
+  kind: 'text' | 'tab' | 'break' | 'placeholder' | 'comment';
   marks?: RunMarks;
   placeholder?: InlinePlaceholder;
+  comment?: CommentInline;
   wrap?: PieceWrap;
   /** Index of the source inline (pieces of one hyperlink/field share it). */
   src: number;
@@ -69,6 +72,9 @@ export function flattenInlines(inlines: Inline[]): Flattened {
       case 'placeholder':
         push({ text: PLACEHOLDER_CHAR, kind: 'placeholder', placeholder: inl });
         break;
+      case 'comment':
+        push({ text: '', kind: 'comment', comment: inl });
+        break;
     }
   }
   return { text: pieces.map((p) => p.text).join(''), pieces };
@@ -102,6 +108,8 @@ export function paragraphPlainText(p: ParagraphBlock): string {
           return i.result.map((r) => r.text).join('');
         case 'placeholder':
           return `[${i.label}]`;
+        case 'comment':
+          return '';
       }
     })
     .join('');

@@ -107,6 +107,19 @@ describe('specific expectations', () => {
     expect(m.afterBreak.get(breakId)?.section).toBe(2);
   });
 
+  it('05: new-file comments are shown but never create or change a difference', () => {
+    const r = get('05');
+    const withComment = r.new.blocks.filter((b) => b.kind === 'paragraph' && b.content.some((i) => i.type === 'comment'));
+    expect(withComment).toHaveLength(3);
+    // The titration paragraph only gained a comment: it stays in an equal segment.
+    const titration = withComment.find((b) => b.kind === 'paragraph' && b.content.some((i) => i.type === 'text' && i.text.startsWith('The dose')))!;
+    const inDiff = Object.values(r.differences).some((d) => d.new.ids.includes(titration.id));
+    expect(inDiff).toBe(false);
+    // 12 → 24 still highlights only the number.
+    const d = Object.values(r.differences).find((x) => x.kind === 'modified' && x.wordHunks.length === 1 && x.wordHunks[0].new[0]?.end - x.wordHunks[0].new[0]?.start === 2);
+    expect(d).toBeTruthy();
+  });
+
   it('large: identical headers produce no section marker', () => {
     const m = sectionMarkers(get('large'));
     expect(m.first).toEqual({});

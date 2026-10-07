@@ -8,7 +8,7 @@ import { ExportDialog } from './ExportDialog';
 import { finalRowContent } from './finalView';
 import { downloadText, Popover, yyyymmdd, type ConfirmRequest } from './kit';
 import { CATEGORY_LABEL, KIND_LABEL, STATUS_LABEL } from './labels';
-import { BlockView, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
+import { BlockView, hasNewComment, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
 import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
 import { ScopePanel } from './ScopePanel';
 
@@ -193,8 +193,8 @@ export function CompareView({
   }, []);
 
   // Batch actions
-  const section = currentId ? result.sections.find((s) => s.id === result.differences[currentId].sectionId) : undefined;
-  const batchSection = (c: Choice) => {
+  const batchSection = (sectionId: string, c: Choice) => {
+    const section = result.sections.find((s) => s.id === sectionId);
     if (!section) return;
     const ids = reviewable.filter((id) => result.differences[id].sectionId === section.id);
     const allowed = ids.filter((id) => c === 'new' || result.differences[id].useOld.available);
@@ -391,36 +391,20 @@ export function CompareView({
                 </div>
                 <Popover label="Batch" title="Apply a choice to many differences at once (one undo step)">
                   {(close) => (
-                    <div className="menu">
-                      <div className="menu-title">{section ? `Section: ${section.title}` : 'Section: select a difference first'}</div>
-                      <button
-                        disabled={!section}
-                        onClick={() => {
-                          close();
-                          batchSection('new');
-                        }}
-                      >
-                        All in this section → Use new
-                      </button>
-                      <button
-                        disabled={!section}
-                        onClick={() => {
-                          close();
-                          batchSection('old');
-                        }}
-                      >
-                        All in this section → Use old
-                      </button>
-                      <div className="menu-sep" />
-                      <button
-                        onClick={() => {
-                          close();
-                          batchUnreviewedNew();
-                        }}
-                      >
-                        All unreviewed → Use new
-                      </button>
-                    </div>
+                    <BatchMenu
+                      result={result}
+                      reviewable={reviewable}
+                      choices={review.state.choices}
+                      defaultSectionId={currentId ? result.differences[currentId].sectionId : undefined}
+                      onSection={(id, c) => {
+                        close();
+                        batchSection(id, c);
+                      }}
+                      onUnreviewedNew={() => {
+                        close();
+                        batchUnreviewedNew();
+                      }}
+                    />
                   )}
                 </Popover>
                 <button className="btn" onClick={doUndo} disabled={!review.history.past.length} title={review.history.past.length ? `Undo: ${review.history.past.at(-1)!.label} (Ctrl+Z)` : 'Nothing to undo'}>
@@ -471,6 +455,63 @@ export function CompareView({
         </div>
       </ActionsContext.Provider>
     </ViewContext.Provider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Batch menu (decision A9: section picker, defaulting to the current difference's section)
+// ---------------------------------------------------------------------------
+
+function BatchMenu({
+  result,
+  reviewable,
+  choices,
+  defaultSectionId,
+  onSection,
+  onUnreviewedNew,
+}: {
+  result: DiffResult;
+  reviewable: DiffId[];
+  choices: Record<DiffId, Choice>;
+  defaultSectionId?: string;
+  onSection: (sectionId: string, c: Choice) => void;
+  onUnreviewedNew: () => void;
+}) {
+  const stats = useMemo(
+    () =>
+      result.sections
+        .map((s) => {
+          const ids = reviewable.filter((id) => result.differences[id].sectionId === s.id);
+          return { s, total: ids.length, open: ids.filter((id) => !choices[id]).length, noOld: ids.filter((id) => !result.differences[id].useOld.available).length };
+        })
+        .filter((x) => x.total > 0),
+    [result, reviewable, choices],
+  );
+  const [sectionId, setSectionId] = useState(defaultSectionId && stats.some((x) => x.s.id === defaultSectionId) ? defaultSectionId : stats[0]?.s.id);
+  const cur = stats.find((x) => x.s.id === sectionId);
+  const unreviewed = reviewable.filter((id) => !choices[id]).length;
+  return (
+    <div className="menu batch-menu">
+      <div className="menu-title">Section</div>
+      <select id="batch-section" className="batch-select" value={sectionId} onChange={(e) => setSectionId(e.target.value)} aria-label="Section">
+        {stats.map((x) => (
+          <option key={x.s.id} value={x.s.id}>
+            {x.s.title} — {x.total} difference(s){x.open ? `, ${x.open} unreviewed` : ''}
+            {x.s.id === defaultSectionId ? ' (current)' : ''}
+          </option>
+        ))}
+      </select>
+      <button disabled={!cur} onClick={() => cur && onSection(cur.s.id, 'new')}>
+        All {cur?.total ?? 0} in this section → Use new
+      </button>
+      <button disabled={!cur || cur.noOld === cur.total} onClick={() => cur && onSection(cur.s.id, 'old')}>
+        All in this section → Use old{cur?.noOld ? ` (${cur.noOld} unavailable, skipped)` : ''}
+      </button>
+      <div className="menu-sep" />
+      <button disabled={!unreviewed} onClick={onUnreviewedNew}>
+        All {unreviewed} unreviewed → Use new
+      </button>
+    </div>
   );
 }
 
@@ -542,7 +583,7 @@ function ViewMenu({ opts, set, result }: { opts: ViewOptions; set: <K extends ke
 // ---------------------------------------------------------------------------
 
 function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'from' | 'to'; compact?: boolean }) {
-  const { choices, currentId } = useView();
+  const { choices, currentId, ix } = useView();
   const a = useContext(ActionsContext);
   const status: ReviewStatus | 'info' = d.informational ? 'info' : ((choices[d.id] as Choice | undefined) ?? 'unreviewed');
   const k = KIND_LABEL[d.kind];
@@ -668,6 +709,11 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
         >
           {part === 'from' ? 'Original location · go to new ↓' : 'New location · go to original ↑'}
         </button>
+      )}
+      {!compact && hasNewComment(d, ix) && (
+        <div className="g-note g-comment" title="Comments in the new file are kept on export. If you use old here or remove this text, check in Word where the comment ends up.">
+          Has a new-file comment
+        </div>
       )}
       {d.kind === 'tableStructure' && !compact && <div className="g-note">Table structure changed — v1 offers a whole-table choice only.</div>}
       {d.summary && !compact && <div className="g-summary">{d.summary}</div>}
