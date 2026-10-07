@@ -185,16 +185,28 @@ class Comparer {
       if (row && row.cells.some((c) => c.vMerge !== 'none')) return null;
     }
     const rows: RowSegment[] = [];
+    // Adjacent added (or removed) rows form one difference, like paragraphs (decision 14, design-review §6.1 G7).
+    let run = null as { kind: 'deleted' | 'inserted'; rows: TableRow[] } | null;
+    const flushRun = () => {
+      if (run) rows.push({ type: 'diff', diffId: (run.kind === 'deleted' ? this.makeDiff('deleted', run.rows, []) : this.makeDiff('inserted', [], run.rows)).id, part: 'whole' });
+      run = null;
+    };
     for (const op of ops) {
+      if (op.type === 'del' || op.type === 'ins') {
+        const kind = op.type === 'del' ? 'deleted' : 'inserted';
+        if (run?.kind !== kind) flushRun();
+        (run ??= { kind, rows: [] }).rows.push(op.type === 'del' ? op.o : op.n);
+        continue;
+      }
+      flushRun();
       if (op.type === 'equal') rows.push({ type: 'equal', oldRowId: op.o.id, newRowId: op.n.id });
-      else if (op.type === 'del') rows.push({ type: 'diff', diffId: this.makeDiff('deleted', [op.o], []).id, part: 'whole' });
-      else if (op.type === 'ins') rows.push({ type: 'diff', diffId: this.makeDiff('inserted', [], [op.n]).id, part: 'whole' });
       else if (op.type === 'pair') {
         const [or, nr] = [op.o[0], op.n[0]];
         const cells: CellPair[] = or.cells.map((oc, i) => ({ oldCellId: oc.id, newCellId: nr.cells[i].id, segments: this.cell(oc, nr.cells[i]) }));
         rows.push({ type: 'rowPair', oldRowId: or.id, newRowId: nr.id, cells });
       }
     }
+    flushRun();
     return { type: 'tablePair', oldTableId: ot.id, newTableId: nt.id, rows };
   }
 

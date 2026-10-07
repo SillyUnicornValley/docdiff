@@ -26,6 +26,24 @@ describe.each(PAIRS)('engine %s', (pair) => {
   defineInvariantTests(async () => (await run(pair)).result);
 });
 
+// A real document pair from the user's work (testdocs/docs/real examples).
+const REAL = {
+  old: 'real examples/77242113PSO3001_Data Management Plan_v1.01_13MAR2025.docx',
+  new: 'real examples/77242113PSO3001_Data Management Plan_V3.02_16Jun2026.docx',
+};
+let real: Promise<CompareOutput> | undefined;
+const runReal = () => (real ??= compareFiles({ name: 'old.docx', data: testdoc(REAL.old) }, { name: 'new.docx', data: testdoc(REAL.new) }));
+
+describe('engine real example (Data Management Plan v1.01 → V3.02)', () => {
+  defineInvariantTests(async () => (await runReal()).result);
+  it('pairs tables at the same place and merges runs of removed rows', async () => {
+    const r = (await runReal()).result;
+    const rowDiffs = Object.values(r.differences).filter((d) => d.old.unit === 'row');
+    expect(rowDiffs.some((d) => d.old.ids.length > 1)).toBe(true);
+    expect(describeResult(r).filter((l) => l === '- [table 57×3]')).toEqual([]);
+  });
+});
+
 describe('engine specifics', () => {
   it('gives the same difference ids when the same files are compared again', async () => {
     const a = (await run('01-basic-text')).result;

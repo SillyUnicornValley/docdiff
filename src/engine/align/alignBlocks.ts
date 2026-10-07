@@ -28,6 +28,8 @@ export type AlignOp<T> =
 /** Pairing thresholds (stage2-design §3.1). */
 export const PAIR_MIN = 0.5;
 export const SPLIT_JOIN_MIN = 0.8;
+/** Two tables at corresponding places pair more easily: row-by-row comparison is still useful. */
+export const TABLE_PAIR_MIN = 0.3;
 export const MOVE_MIN = 0.8;
 export const MOVE_MIN_WORDS = 5;
 /** Larger gaps are not paired (two unrelated documents): everything is deleted / inserted. */
@@ -47,6 +49,8 @@ interface UnitSpec<T> {
   movable?(u: T): boolean;
   /** Lone deleted + inserted unit at the same place: pair them anyway? */
   lonePair?(o: T, n: T): boolean;
+  /** Units too common to anchor an alignment (empty paragraphs, empty rows). */
+  weak?(u: T): boolean;
 }
 
 const isPara = (b: Block): b is ParagraphBlock => b.kind === 'paragraph';
@@ -73,12 +77,14 @@ const BLOCKS: UnitSpec<Block> = {
     if (isReplacement(os, ns)) return PAIR_MIN;
     if (os.length === 1 && ns.length === 1) {
       const [x, y] = [os[0], ns[0]];
-      return (isPara(x) && isPara(y) && !isEmpty(x) && !isEmpty(y)) || (x.kind === 'table' && y.kind === 'table') ? PAIR_MIN : undefined;
+      if (x.kind === 'table' && y.kind === 'table') return TABLE_PAIR_MIN;
+      return isPara(x) && isPara(y) && !isEmpty(x) && !isEmpty(y) ? PAIR_MIN : undefined;
     }
     return [...os, ...ns].every((b) => isPara(b) && !isEmpty(b)) ? SPLIT_JOIN_MIN : undefined;
   },
   movable: (b) => isPara(b) && wordCount([b]) >= MOVE_MIN_WORDS,
-  lonePair: (o, n) => (isPara(o) && isPara(n) && !isEmpty(o) && !isEmpty(n)) || isReplacement([o], [n]),
+  weak: isEmpty,
+  lonePair: (o, n) => (isPara(o) && isPara(n) && !isEmpty(o) && !isEmpty(n)) || isReplacement([o], [n]) || (o.kind === 'table' && n.kind === 'table'),
 };
 
 const rowKeyCache = new WeakMap<TableRow, string>();
@@ -116,6 +122,7 @@ const ROWS: UnitSpec<TableRow> = {
   similarity: rowSimilarity,
   // Rows pair 1:1 only; an empty row never pairs by similarity.
   pairRule: (os, ns) => (os.length === 1 && ns.length === 1 && wordCount(rowParas(os)) > 0 && wordCount(rowParas(ns)) > 0 ? PAIR_MIN : undefined),
+  weak: (r) => wordCount(rowParas([r])) === 0,
 };
 
 /** Patience anchors: (oldIndex, newIndex) of keys unique on both sides, longest increasing run. */
@@ -185,6 +192,7 @@ function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   if (n === 0 || m === 0 || n * m > MAX_GAP_CELLS) return unpaired();
 
   const len = (us: T[]) => wordCount(spec.paras(us)) + 1;
+  const keys = { o: O.map(spec.key), n: N.map(spec.key) };
   const simCache = new Map<string, number>();
   const sim = (i0: number, i1: number, j0: number, j1: number) => {
     const k = `${i0},${i1},${j0},${j1}`;
@@ -196,7 +204,7 @@ function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   // score[i][j]: best total for O[0..i) vs N[0..j). Matched content scores sim × size.
   const W = m + 1;
   const score = new Float64Array((n + 1) * W);
-  const back = new Int32Array((n + 1) * W); // encoded step: 0 del, 1 ins, 100·ko + kn for a match
+  const back = new Int32Array((n + 1) * W); // encoded step: 0 del, 1 ins, 2 equal, 100·ko + kn for a match
   for (let i = 0; i <= n; i++)
     for (let j = 0; j <= m; j++) {
       if (i === 0 && j === 0) continue;
@@ -204,6 +212,8 @@ function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
       let step = 0;
       if (i > 0 && score[(i - 1) * W + j] > best) (best = score[(i - 1) * W + j]), (step = 0);
       if (j > 0 && score[i * W + j - 1] > best) (best = score[i * W + j - 1]), (step = 1);
+      // Identical weak units (e.g. empty paragraphs) folded into the gap: keep them aligned when it costs nothing.
+      if (i > 0 && j > 0 && keys.o[i - 1] === keys.n[j - 1] && score[(i - 1) * W + j - 1] + 0.01 > best) (best = score[(i - 1) * W + j - 1] + 0.01), (step = 2);
       if (i > 0 && j > 0) {
         for (let ko = 1; ko <= Math.min(MAX_SPLIT, i); ko++)
           for (let kn = 1; kn <= Math.min(MAX_SPLIT, j); kn++) {
@@ -229,6 +239,7 @@ function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
     const step = back[i * W + j];
     if (step === 0) rev.push({ type: 'del', o: O[--i] });
     else if (step === 1) rev.push({ type: 'ins', n: N[--j] });
+    else if (step === 2) rev.push({ type: 'equal', o: O[--i], n: N[--j] });
     else {
       const ko = Math.floor(step / 100);
       const kn = step % 100;
@@ -263,22 +274,24 @@ function normalise<T>(ops: AlignOp<T>[]): AlignOp<T>[] {
 }
 
 function alignUnits<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
-  // Steps 1–3.
+  // Steps 1–3. Gaps run between "strong" equal units; identical weak units
+  // inside a gap (an empty paragraph between a deleted and an inserted table)
+  // are re-aligned within the gap instead of splitting it.
   let ops: AlignOp<T>[] = [];
-  let gapO: T[] = [];
-  let gapN: T[] = [];
+  let pending: AlignOp<T>[] = [];
   const flushGap = () => {
-    if (gapO.length || gapN.length) ops.push(...pairGap(gapO, gapN, spec));
-    gapO = [];
-    gapN = [];
+    if (pending.some((op) => op.type !== 'equal')) {
+      const gapO = pending.flatMap((op) => (op.type === 'del' || op.type === 'equal' ? [op.o] : []));
+      const gapN = pending.flatMap((op) => (op.type === 'ins' || op.type === 'equal' ? [op.n] : []));
+      ops.push(...pairGap(gapO, gapN, spec));
+    } else ops.push(...pending);
+    pending = [];
   };
   for (const op of exactOps(o, n, spec)) {
-    if (op.type === 'del') gapO.push(op.o);
-    else if (op.type === 'ins') gapN.push(op.n);
-    else {
+    if (op.type === 'equal' && !spec.weak?.(op.o)) {
       flushGap();
       ops.push(op);
-    }
+    } else pending.push(op);
   }
   flushGap();
 

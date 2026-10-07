@@ -42,7 +42,7 @@ export function describeResult(r: DiffResult): string[] {
           } else {
             const d = r.diffId && result.differences[r.diffId];
             const side = d && d.kind === 'deleted' ? 'old' : 'new';
-            lines.push(`${indent}  row${side === 'old' ? '-' : '+'} ${rowText(side, d ? d[side].ids[0] : '')}`);
+            lines.push(`${indent}  row${side === 'old' ? '-' : '+'} ${d ? d[side].ids.map((id) => rowText(side, id)).join(' ¶ ') : ''}`);
           }
         }
       } else {
