@@ -1,28 +1,29 @@
-// Align the blocks of one container (docs/stage2-design.md §3.1):
-//  1. anchors: blocks whose content is unique on both sides (patience diff);
+// Align two sequences of units: the blocks of a container, or the rows of a
+// table (docs/stage2-design.md §3.1, §3.2):
+//  1. anchors: units whose content is unique on both sides (patience diff);
 //  2. Myers diff between anchors;
-//  3. in each changed gap, pair blocks by similarity, in order, allowing
-//     1→2..3 splits, 2..3→1 joins, and paragraphs ↔ a table (replaced);
-//  4. moves: unpaired deleted/inserted paragraphs that match elsewhere.
-// A lone deleted + inserted paragraph at the same place becomes one
-// "modified" pair even when unrelated (shown as a whole replacement).
+//  3. in each changed gap, pair units by similarity, in order (blocks also
+//     allow 1→2..3 splits, 2..3→1 joins, and paragraphs ↔ a table);
+//  4. moves (blocks only): unpaired deleted/inserted paragraphs that match elsewhere.
+// For blocks, a lone deleted + inserted block at the same place becomes one
+// pair even when unrelated (shown as a whole replacement; design-review §6.1 G5).
 
-import type { Block, ParagraphBlock } from '../../model/document';
+import type { Block, ParagraphBlock, TableRow } from '../../model/document';
 import { forEachParagraph } from '../../model/docIndex';
 import { flattenParagraph } from '../../model/flatten';
 import { blockKey } from '../compare/keys';
 import { similarity, wordCount } from '../compare/wordDiff';
 import { diffKeys } from './myers';
 
-export type AlignOp =
-  | { type: 'equal'; o: Block; n: Block }
-  | { type: 'del'; o: Block }
-  | { type: 'ins'; n: Block }
+export type AlignOp<T> =
+  | { type: 'equal'; o: T; n: T }
+  | { type: 'del'; o: T }
+  | { type: 'ins'; n: T }
   /** Paired content: 1:1, a split (1:k) or a join (k:1). */
-  | { type: 'pair'; o: Block[]; n: Block[]; sim: number }
+  | { type: 'pair'; o: T[]; n: T[]; sim: number }
   /** Moved paragraph: both halves share `move`. */
-  | { type: 'moveFrom'; o: Block; move: number; sim: number }
-  | { type: 'moveTo'; n: Block; move: number; sim: number };
+  | { type: 'moveFrom'; o: T; move: number; sim: number }
+  | { type: 'moveTo'; n: T; move: number; sim: number };
 
 /** Pairing thresholds (stage2-design §3.1). */
 export const PAIR_MIN = 0.5;
@@ -33,6 +34,21 @@ export const MOVE_MIN_WORDS = 5;
 const MAX_GAP_CELLS = 40_000;
 const MAX_SPLIT = 3;
 
+/** What the generic aligner needs to know about a kind of unit. */
+interface UnitSpec<T> {
+  key(u: T): string;
+  /** Paragraphs the unit contributes to similarity. */
+  paras(us: T[]): ParagraphBlock[];
+  /** Similarity of two runs; defaults to word similarity of their paragraphs. */
+  similarity?(os: T[], ns: T[]): number;
+  /** Can these runs (1:1, or 1:k / k:1) be paired, and with which minimum similarity? */
+  pairRule(os: T[], ns: T[]): number | undefined;
+  /** Paragraph that may take part in a move (blocks only). */
+  movable?(u: T): boolean;
+  /** Lone deleted + inserted unit at the same place: pair them anyway? */
+  lonePair?(o: T, n: T): boolean;
+}
+
 const isPara = (b: Block): b is ParagraphBlock => b.kind === 'paragraph';
 const isEmpty = (b: Block) => isPara(b) && flattenParagraph(b).text.trim() === '';
 
@@ -42,6 +58,65 @@ function parasOf(blocks: Block[]): ParagraphBlock[] {
   forEachParagraph(blocks, (p) => out.push(p));
   return out;
 }
+
+/** Paragraphs on one side, one table on the other: a block-type change (spec §7.7, "replaced"). */
+export function isReplacement(os: Block[], ns: Block[]) {
+  const paras = (bs: Block[]) => bs.length > 0 && bs.every((b) => isPara(b) && !isEmpty(b));
+  const table = (bs: Block[]) => bs.length === 1 && bs[0].kind === 'table';
+  return (paras(os) && table(ns)) || (table(os) && paras(ns));
+}
+
+const BLOCKS: UnitSpec<Block> = {
+  key: blockKey,
+  paras: parasOf,
+  pairRule(os, ns) {
+    if (isReplacement(os, ns)) return PAIR_MIN;
+    if (os.length === 1 && ns.length === 1) {
+      const [x, y] = [os[0], ns[0]];
+      return (isPara(x) && isPara(y) && !isEmpty(x) && !isEmpty(y)) || (x.kind === 'table' && y.kind === 'table') ? PAIR_MIN : undefined;
+    }
+    return [...os, ...ns].every((b) => isPara(b) && !isEmpty(b)) ? SPLIT_JOIN_MIN : undefined;
+  },
+  movable: (b) => isPara(b) && wordCount([b]) >= MOVE_MIN_WORDS,
+  lonePair: (o, n) => (isPara(o) && isPara(n) && !isEmpty(o) && !isEmpty(n)) || isReplacement([o], [n]),
+};
+
+const rowKeyCache = new WeakMap<TableRow, string>();
+export const rowKey = (r: TableRow) => {
+  let k = rowKeyCache.get(r);
+  if (k === undefined) rowKeyCache.set(r, (k = r.cells.map((c) => `${c.gridSpan}/${c.vMerge}:${c.blocks.map(blockKey).join('\u0003')}`).join('\u0004')));
+  return k;
+};
+const rowParas = (rs: TableRow[]) => parasOf(rs.flatMap((r) => r.cells.flatMap((c) => c.blocks)));
+
+const cellKey = (c: TableRow['cells'][number]) => c.blocks.map(blockKey).join('\u0003');
+
+/**
+ * Rows are short, so word similarity alone is too strict ("Creatinine | mg/dL" vs
+ * "Creatinine | umol/L" shares 1 of 3 words). Also count identical cells, if at
+ * least one of them has text.
+ */
+function rowSimilarity(os: TableRow[], ns: TableRow[]): number {
+  const words = similarity(rowParas(os), rowParas(ns));
+  if (os.length !== 1 || ns.length !== 1 || os[0].cells.length !== ns[0].cells.length) return words;
+  const [a, b] = [os[0].cells, ns[0].cells];
+  let same = 0;
+  let sameText = 0;
+  a.forEach((c, i) => {
+    if (cellKey(c) !== cellKey(b[i])) return;
+    same++;
+    if (wordCount(parasOf(c.blocks)) > 0) sameText++;
+  });
+  return sameText > 0 ? Math.max(words, same / a.length) : words;
+}
+
+const ROWS: UnitSpec<TableRow> = {
+  key: rowKey,
+  paras: rowParas,
+  similarity: rowSimilarity,
+  // Rows pair 1:1 only; an empty row never pairs by similarity.
+  pairRule: (os, ns) => (os.length === 1 && ns.length === 1 && wordCount(rowParas(os)) > 0 && wordCount(rowParas(ns)) > 0 ? PAIR_MIN : undefined),
+};
 
 /** Patience anchors: (oldIndex, newIndex) of keys unique on both sides, longest increasing run. */
 function anchors(a: string[], b: string[]): [number, number][] {
@@ -77,10 +152,10 @@ function anchors(a: string[], b: string[]): [number, number][] {
 }
 
 /** Step 1 + 2: equal / del / ins ops in document order. */
-function exactOps(o: Block[], n: Block[]): AlignOp[] {
-  const a = o.map(blockKey);
-  const b = n.map(blockKey);
-  const ops: AlignOp[] = [];
+function exactOps<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
+  const a = o.map(spec.key);
+  const b = n.map(spec.key);
+  const ops: AlignOp<T>[] = [];
   let i0 = 0;
   let j0 = 0;
   const run = (i1: number, j1: number) => {
@@ -100,29 +175,21 @@ function exactOps(o: Block[], n: Block[]): AlignOp[] {
   return ops;
 }
 
-/** Can these blocks take part in a similarity pairing? */
-const pairable = (x: Block, y: Block) => (isPara(x) && isPara(y) && !isEmpty(x) && !isEmpty(y)) || (x.kind === 'table' && y.kind === 'table');
-
-/** Paragraphs on one side, one table on the other: a block-type change (spec §7.7, "replaced"). */
-function replacement(os: Block[], ns: Block[]) {
-  const paras = (bs: Block[]) => bs.every((b) => isPara(b) && !isEmpty(b));
-  const table = (bs: Block[]) => bs.length === 1 && bs[0].kind === 'table';
-  return (paras(os) && table(ns)) || (table(os) && paras(ns));
-}
+const simOf = <T>(spec: UnitSpec<T>, os: T[], ns: T[]) => (spec.similarity ? spec.similarity(os, ns) : similarity(spec.paras(os), spec.paras(ns)));
 
 /** Step 3: order-preserving pairing inside one gap by dynamic programming. */
-function pairGap(O: Block[], N: Block[]): AlignOp[] {
+function pairGap<T>(O: T[], N: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   const n = O.length;
   const m = N.length;
-  const unpaired = (): AlignOp[] => [...O.map((o): AlignOp => ({ type: 'del', o })), ...N.map((x): AlignOp => ({ type: 'ins', n: x }))];
+  const unpaired = (): AlignOp<T>[] => [...O.map((o): AlignOp<T> => ({ type: 'del', o })), ...N.map((x): AlignOp<T> => ({ type: 'ins', n: x }))];
   if (n === 0 || m === 0 || n * m > MAX_GAP_CELLS) return unpaired();
 
-  const len = (bs: Block[]) => wordCount(parasOf(bs)) + 1;
+  const len = (us: T[]) => wordCount(spec.paras(us)) + 1;
   const simCache = new Map<string, number>();
   const sim = (i0: number, i1: number, j0: number, j1: number) => {
     const k = `${i0},${i1},${j0},${j1}`;
     let s = simCache.get(k);
-    if (s === undefined) simCache.set(k, (s = similarity(parasOf(O.slice(i0, i1)), parasOf(N.slice(j0, j1)))));
+    if (s === undefined) simCache.set(k, (s = simOf(spec, O.slice(i0, i1), N.slice(j0, j1))));
     return s;
   };
 
@@ -143,11 +210,10 @@ function pairGap(O: Block[], N: Block[]): AlignOp[] {
             if (ko > 1 && kn > 1) continue; // splits and joins only, not n:m
             const os = O.slice(i - ko, i);
             const ns = N.slice(j - kn, j);
-            const mixed = replacement(os, ns);
-            const ok = mixed || (ko === 1 && kn === 1 ? pairable(os[0], ns[0]) : [...os, ...ns].every((b) => isPara(b) && !isEmpty(b)));
-            if (!ok) continue;
+            const min = spec.pairRule(os, ns);
+            if (min === undefined) continue;
             const s = sim(i - ko, i, j - kn, j);
-            if (s < (mixed || (ko === 1 && kn === 1) ? PAIR_MIN : SPLIT_JOIN_MIN)) continue;
+            if (s < min) continue;
             const v = score[(i - ko) * W + j - kn] + s * (len(os) + len(ns));
             if (v > best) (best = v), (step = 100 * ko + kn);
           }
@@ -156,7 +222,7 @@ function pairGap(O: Block[], N: Block[]): AlignOp[] {
       back[i * W + j] = step;
     }
 
-  const rev: AlignOp[] = [];
+  const rev: AlignOp<T>[] = [];
   let i = n;
   let j = m;
   while (i > 0 || j > 0) {
@@ -175,10 +241,10 @@ function pairGap(O: Block[], N: Block[]): AlignOp[] {
 }
 
 /** Within each run of unpaired ops: deletions first, then insertions (old content is shown above new). */
-function normalise(ops: AlignOp[]): AlignOp[] {
-  const out: AlignOp[] = [];
-  let dels: AlignOp[] = [];
-  let ins: AlignOp[] = [];
+function normalise<T>(ops: AlignOp<T>[]): AlignOp<T>[] {
+  const out: AlignOp<T>[] = [];
+  let dels: AlignOp<T>[] = [];
+  let ins: AlignOp<T>[] = [];
   const flush = () => {
     out.push(...dels, ...ins);
     dels = [];
@@ -196,18 +262,17 @@ function normalise(ops: AlignOp[]): AlignOp[] {
   return out;
 }
 
-export function alignBlocks(o: Block[], n: Block[]): AlignOp[] {
+function alignUnits<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   // Steps 1–3.
-  const exact = exactOps(o, n);
-  let ops: AlignOp[] = [];
-  let gapO: Block[] = [];
-  let gapN: Block[] = [];
+  let ops: AlignOp<T>[] = [];
+  let gapO: T[] = [];
+  let gapN: T[] = [];
   const flushGap = () => {
-    if (gapO.length || gapN.length) ops.push(...pairGap(gapO, gapN));
+    if (gapO.length || gapN.length) ops.push(...pairGap(gapO, gapN, spec));
     gapO = [];
     gapN = [];
   };
-  for (const op of exact) {
+  for (const op of exactOps(o, n, spec)) {
     if (op.type === 'del') gapO.push(op.o);
     else if (op.type === 'ins') gapN.push(op.n);
     else {
@@ -218,40 +283,45 @@ export function alignBlocks(o: Block[], n: Block[]): AlignOp[] {
   flushGap();
 
   // Step 4: moves among the remaining deleted / inserted paragraphs.
-  const dels = ops.flatMap((op, k) => (op.type === 'del' && isPara(op.o) && wordCount([op.o]) >= MOVE_MIN_WORDS ? [k] : []));
-  const inss = ops.flatMap((op, k) => (op.type === 'ins' && isPara(op.n) && wordCount([op.n]) >= MOVE_MIN_WORDS ? [k] : []));
-  const candidates: { d: number; i: number; s: number }[] = [];
-  if (dels.length * inss.length <= MAX_GAP_CELLS)
-    for (const d of dels)
-      for (const i of inss) {
-        const s = similarity([(ops[d] as { o: ParagraphBlock }).o], [(ops[i] as { n: ParagraphBlock }).n]);
-        if (s >= MOVE_MIN) candidates.push({ d, i, s });
-      }
-  candidates.sort((x, y) => y.s - x.s);
-  const used = new Set<number>();
-  let moveNo = 0;
-  for (const c of candidates) {
-    if (used.has(c.d) || used.has(c.i)) continue;
-    used.add(c.d).add(c.i);
-    const move = ++moveNo;
-    ops[c.d] = { type: 'moveFrom', o: (ops[c.d] as { o: Block }).o, move, sim: c.s };
-    ops[c.i] = { type: 'moveTo', n: (ops[c.i] as { n: Block }).n, move, sim: c.s };
+  if (spec.movable) {
+    const movable = spec.movable;
+    const dels = ops.flatMap((op, k) => (op.type === 'del' && movable(op.o) ? [k] : []));
+    const inss = ops.flatMap((op, k) => (op.type === 'ins' && movable(op.n) ? [k] : []));
+    const candidates: { d: number; i: number; s: number }[] = [];
+    if (dels.length * inss.length <= MAX_GAP_CELLS)
+      for (const d of dels)
+        for (const i of inss) {
+          const s = similarity(spec.paras([(ops[d] as { o: T }).o]), spec.paras([(ops[i] as { n: T }).n]));
+          if (s >= MOVE_MIN) candidates.push({ d, i, s });
+        }
+    candidates.sort((x, y) => y.s - x.s);
+    const used = new Set<number>();
+    let moveNo = 0;
+    for (const c of candidates) {
+      if (used.has(c.d) || used.has(c.i)) continue;
+      used.add(c.d).add(c.i);
+      const move = ++moveNo;
+      ops[c.d] = { type: 'moveFrom', o: (ops[c.d] as { o: T }).o, move, sim: c.s };
+      ops[c.i] = { type: 'moveTo', n: (ops[c.i] as { n: T }).n, move, sim: c.s };
+    }
   }
 
   ops = normalise(ops);
+  if (!spec.lonePair) return ops;
 
-  // A lone deleted + inserted paragraph at the same place: one whole replacement.
-  const out: AlignOp[] = [];
+  // A lone deleted + inserted unit at the same place: one whole replacement.
+  const out: AlignOp<T>[] = [];
   for (let k = 0; k < ops.length; k++) {
     const a = ops[k];
     const b = ops[k + 1];
-    const before = ops[k - 1];
-    const after = ops[k + 2];
-    const lone = (x?: AlignOp) => !x || (x.type !== 'del' && x.type !== 'ins');
-    if (a.type === 'del' && b?.type === 'ins' && lone(before) && lone(after) && isPara(a.o) && isPara(b.n) && !isEmpty(a.o) && !isEmpty(b.n)) {
-      out.push({ type: 'pair', o: [a.o], n: [b.n], sim: similarity([a.o], [b.n]) });
+    const lone = (x?: AlignOp<T>) => !x || (x.type !== 'del' && x.type !== 'ins');
+    if (a.type === 'del' && b?.type === 'ins' && lone(ops[k - 1]) && lone(ops[k + 2]) && spec.lonePair(a.o, b.n)) {
+      out.push({ type: 'pair', o: [a.o], n: [b.n], sim: simOf(spec, [a.o], [b.n]) });
       k++;
     } else out.push(a);
   }
   return out;
 }
+
+export const alignBlocks = (o: Block[], n: Block[]) => alignUnits(o, n, BLOCKS);
+export const alignRows = (o: TableRow[], n: TableRow[]) => alignUnits(o, n, ROWS);

@@ -11,7 +11,7 @@ A browser-only tool for comparing and merging two Word (.docx) files. It targets
 ## Status
 
 - **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). The UI decisions are recorded in `docs/prototype-notes.md`.
-- **Stage 2 (in progress):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/stage2-design.md`. M1 (reading .docx) and M2 (paragraph alignment, word-level diff) are done; next is M3 (row- and cell-level table comparison).
+- **Stage 2 (in progress):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/stage2-design.md`. M1 (reading .docx), M2 (paragraph alignment, word-level diff) and M3 (row/cell-level tables) are done; next is M4 (sections and header/footer pairing, scope details) and M5 (Web Worker, performance).
 
 ## Commands
 

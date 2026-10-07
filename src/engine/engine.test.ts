@@ -73,7 +73,7 @@ function changedTexts(r: DiffResult, kinds: string[], side: 'old' | 'new') {
 const blockTexts = (r: DiffResult, kind: string, side: 'old' | 'new') => {
   const ix = new DocIndex(r[side]);
   return Object.values(r.differences)
-    .filter((d) => d.kind === kind)
+    .filter((d) => d.kind === kind && d[side].unit === 'block')
     .flatMap((d) => paragraphTexts(d[side].ids.map((id) => ix.block(id))));
 };
 
@@ -141,11 +141,48 @@ describe('expected outlines (testdocs/README.md)', () => {
     expect(o).toContain('+ Concomitant Medications ¶ Stable doses of lipid-lowering therapy are permitted.');
   });
 
-  it('03 tables: paragraphs → table is one replacement; a table replaced by a sentence is delete + insert', async () => {
-    const o = await outline('03-tables');
-    expect(o).toContain('~(replaced) Sponsor: Acme Pharma Ltd. ¶ CRO: Beta Research Inc. ⟶ [table 3×2]');
-    expect(o).toContain('- [table 3×2]');
-    expect(o).toContain('+ Abbreviations are defined at first use in the text.');
+  it('03 tables', async () => {
+    const o = (await outline('03-tables')).filter((l) => !l.startsWith('= '));
+    expect(o).toEqual([
+      // Same columns: row by row; each added / removed row and each changed cell is its own choice.
+      '[table pair]',
+      '  row= Cohort | Dose | Participants',
+      '  row= 1 | 10 mg | 12',
+      '  row+ 1b | 15 mg | 6',
+      '  row~ 2 | 20 mg | 18',
+      '    ~ 12 ⟶ 18',
+      '  row- 3 | 40 mg | 12',
+      '  row= 4 | 80 mg | 12',
+      '  row+ 5 | 160 mg | 6',
+      // Column added; merged cell extended: whole-table choice (decision 6).
+      '~(tableStructure) [table 5×4] ⟶ [table 5×5]',
+      '~(tableStructure) [table 6×3] ⟶ [table 8×3]',
+      // Block type changed at the same place: one replacement (design-review §6.1 G5).
+      '~(replaced) Sponsor: Acme Pharma Ltd. ¶ CRO: Beta Research Inc. ⟶ [table 3×2]',
+      '~(replaced) [table 3×2] ⟶ Abbreviations are defined at first use in the text.',
+      // Nested table compared inside its cell.
+      '[table pair]',
+      '  row= Item | Details',
+      '  row~ Visit windows | Windows are relative to baseline: [table 2×2] ',
+      '    [table pair]',
+      '      row= Visit | Window',
+      '      row~ Week 4 | +/- 5 days',
+      '        ~ +/- 3 days ⟶ +/- 5 days',
+    ]);
+  });
+
+  it('03: whole-table differences still highlight the changed cells', async () => {
+    const r = (await run('03-tables')).result;
+    const ts = Object.values(r.differences).filter((d) => d.kind === 'tableStructure');
+    expect(ts.every((d) => d.wordHunks.length > 0)).toBe(true);
+    const newText = changedTexts(r, ['tableStructure'], 'new');
+    expect(newText).toEqual(expect.arrayContaining(['24', 'Week 4', 'Neutrophils', 'umol/L']));
+  });
+
+  it('04: rows inserted and deleted by tracked changes', async () => {
+    const o = await outline('04-tracked-changes');
+    expect(o).toContain('  row+ Run-in | -7');
+    expect(o).toContain('  row- Week 12 | 84');
   });
 
   it('04 tracked changes: compared after accepting', async () => {
@@ -176,10 +213,18 @@ describe('expected outlines (testdocs/README.md)', () => {
         if (!deleted.some((t) => t.startsWith(prefix(l)))) missing.push(l);
       } else if (l.startsWith('MOVE')) {
         if (!moved.some((t) => t.startsWith(prefix(l)))) missing.push(l);
+      } else if (l.startsWith('CELL')) {
+        const [, from, to] = /: '(.*)' -> '(.*)'$/.exec(l)!;
+        if (!(to ? newWords.includes(to) : changedTexts(r, ['modified'], 'old').includes(from))) missing.push(l);
       }
     }
     expect(missing).toEqual([]);
     expect(inserted.length).toBeGreaterThanOrEqual(lines.filter((l) => l.startsWith('INSERT')).length);
     expect(Object.values(r.differences).filter((d) => d.kind === 'moved')).toHaveLength(2);
+    const rowsAdded = Object.values(r.differences).filter((d) => d.kind === 'inserted' && d.new.unit === 'row');
+    expect(rowsAdded).toHaveLength(lines.filter((l) => l.startsWith('ROW+')).length);
+    // Nothing reported beyond the list: 40 word edits + 10 cell edits.
+    expect(Object.values(r.differences).filter((d) => d.kind === 'modified')).toHaveLength(50);
+    expect(Object.values(r.differences).some((d) => d.kind === 'tableStructure')).toBe(false);
   });
 });
