@@ -9,6 +9,7 @@ import { flattenParagraph } from '../model/flatten';
 import { invertResult } from '../model/invert';
 import type { Choice } from '../model/review';
 import { MOCK_PAIRS } from './index';
+import { sectionMarkers } from '../ui/rows';
 
 const text = (blocks: Block[]) => {
   const out: string[] = [];
@@ -63,6 +64,18 @@ describe('specific expectations', () => {
     expect(d).toBeTruthy();
   });
 
+  it('A2: each modified paragraph is its own difference; adjacent inserts merge', () => {
+    const r01 = get('01');
+    const mods = Object.values(r01.differences).filter((d) => d.kind === 'modified');
+    expect(mods.every((d) => d.old.ids.length === 1 && d.new.ids.length === 1)).toBe(true);
+    const r02 = get('02');
+    expect(Object.values(r02.differences).some((d) => d.kind === 'inserted' && d.new.ids.length === 3)).toBe(true);
+    // 06 typography: one difference per paragraph, each with a single category.
+    const r06 = get('06');
+    const cats = Object.values(r06.differences).map((d) => d.category).filter(Boolean);
+    expect(cats).toEqual(expect.arrayContaining(['quotes', 'dashes', 'whitespace', 'case']));
+  });
+
   it('05: footnote and field differences block "Use old"', () => {
     const r = get('05');
     const reasons = Object.values(r.differences)
@@ -76,6 +89,28 @@ describe('specific expectations', () => {
     const r = get('06');
     const cats = new Set(Object.values(r.differences).flatMap((d) => d.wordHunks.map((h) => h.category)));
     for (const c of ['whitespace', 'quotes', 'dashes', 'case']) expect(cats).toContain(c);
+  });
+
+  it('05: headers and footers are hinted per section', () => {
+    const r = get('05');
+    expect(r.scope.sectionHints.map((h) => `${h.part}:${h.oldSection ?? '-'}:${h.newSection ?? '-'}:${h.result}`)).toEqual([
+      'header:1:1:mayDiffer',
+      'footer:1:1:same',
+      'header:-:2:onlyNew',
+      'footer:-:2:onlyNew',
+    ]);
+    const m = sectionMarkers(r);
+    expect(m.first.old?.section).toBe(1);
+    expect(m.first.new?.section).toBe(1);
+    // Section 2 of the new file is marked on the paragraph that carries the break.
+    const breakId = r.new.sections[0].breakBlockId!;
+    expect(m.afterBreak.get(breakId)?.section).toBe(2);
+  });
+
+  it('large: identical headers produce no section marker', () => {
+    const m = sectionMarkers(get('large'));
+    expect(m.first).toEqual({});
+    expect(m.afterBreak.size).toBe(0);
   });
 
   it('large: about 3,000 blocks', () => {

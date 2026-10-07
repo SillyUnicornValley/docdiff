@@ -1,7 +1,7 @@
 // Diff model: what the comparison engine (Stage 2) produces for a document pair.
 // It never changes after comparison. User choices live in review.ts.
 
-import type { DocModel, NodeId, FingerprintedPart } from './document';
+import type { DocModel, FingerprintedPart, HeaderVariant, NodeId } from './document';
 
 export type DiffId = string;
 
@@ -167,9 +167,25 @@ export interface FingerprintHint {
   message?: string; // "Header text differs; not compared item by item."
 }
 
+/**
+ * Header/footer "may differ" hint for one section pair and one variant.
+ * Sections are paired by their position in the alignment (section breaks that
+ * fall in the same aligned place); a section present on one side only is
+ * 'onlyOld' / 'onlyNew'.
+ */
+export interface SectionHint {
+  part: 'header' | 'footer';
+  variant: HeaderVariant;
+  oldSection?: number;
+  newSection?: number;
+  result: 'same' | 'mayDiffer' | 'onlyOld' | 'onlyNew';
+}
+
 export interface CheckScope {
   items: ScopeItem[];
   fingerprints: FingerprintHint[];
+  /** Headers and footers, per section and variant. */
+  sectionHints: SectionHint[];
   formatting: 'notChecked';
   unsupportedRevisions: { side: 'old' | 'new'; type: string; location: string }[];
   /** Pending revisions in the NEW file; they will be accepted on export. */

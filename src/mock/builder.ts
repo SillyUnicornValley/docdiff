@@ -7,8 +7,11 @@ import type {
   Block,
   BlockPlaceholderKind,
   DocModel,
+  DocSection,
   FieldType,
   FingerprintedPart,
+  HeaderFooterRef,
+  HeaderVariant,
   Inline,
   InlinePlaceholder,
   InlinePlaceholderKind,
@@ -34,6 +37,7 @@ import type {
   RowSegment,
   ScopeItem,
   Section,
+  SectionHint,
   Segment,
   UseOldAvailability,
   UseOldBlockReason,
@@ -296,6 +300,7 @@ interface ChangeOpts extends WordDiffOptions {
 }
 
 interface Member {
+  sectionId: string;
   kind: DiffKind;
   old: Block[];
   new: Block[];
@@ -348,7 +353,7 @@ export class Container {
     let hunks: WordHunk[] = opts.hunks ?? [];
     if ((kind === 'modified' || kind === 'splitJoin') && !opts.hunks) hunks = wordDiff(paras(o), paras(n), opts);
     if (this.group && !opts.informational) {
-      this.group.push({ kind, old: o, new: n, hunks });
+      this.group.push({ sectionId: this.pair.currentSection, kind, old: o, new: n, hunks });
       return;
     }
     const id = this.pair.addDiff({ kind, old: o, new: n, hunks, unit: 'block', ...opts });
@@ -409,26 +414,29 @@ export class Container {
     return this;
   }
 
-  /** Consecutive changes inside `fn` become ONE difference (spec §7.2). */
+  /**
+   * A run of consecutive changes, split into differences by the granularity
+   * rule (decision 2026-10-07, A2): every paired paragraph (modified, split /
+   * join) is its own difference; adjacent inserted paragraphs merge into one
+   * difference, and so do adjacent deleted paragraphs.
+   */
   grouped(fn: (c: this) => void, opts: Omit<ChangeOpts, 'hunks'> = {}) {
-    const sectionId = this.pair.currentSection;
     this.group = [];
     fn(this);
     const members = this.group;
     this.group = null;
-    if (members.length === 0) return this;
-    const kinds = new Set(members.map((m) => m.kind));
-    const kind: DiffKind = kinds.size === 1 ? members[0].kind : 'modified';
-    const id = this.pair.addDiff({
-      kind,
-      old: members.flatMap((m) => m.old),
-      new: members.flatMap((m) => m.new),
-      hunks: members.flatMap((m) => m.hunks),
-      unit: 'block',
-      sectionId,
-      ...opts,
-    });
-    this.segments.push({ type: 'diff', diffId: id, part: 'whole' });
+    const runs: Member[] = [];
+    for (const m of members) {
+      const last = runs.at(-1);
+      if (last && (m.kind === 'inserted' || m.kind === 'deleted') && last.kind === m.kind) {
+        last.old.push(...m.old);
+        last.new.push(...m.new);
+      } else runs.push({ ...m, old: [...m.old], new: [...m.new] });
+    }
+    for (const m of runs) {
+      const id = this.pair.addDiff({ kind: m.kind, old: m.old, new: m.new, hunks: m.hunks, unit: 'block', sectionId: m.sectionId, ...opts });
+      this.segments.push({ type: 'diff', diffId: id, part: 'whole' });
+    }
     return this;
   }
 
@@ -556,6 +564,13 @@ export class RowBuilder {
 // Pair builder (top level)
 // ---------------------------------------------------------------------------
 
+/** Header/footer text per variant; 'linked' = Word's "Link to Previous". A plain string is the default variant. */
+type HFSpec = string | Partial<Record<HeaderVariant, string>>;
+export interface SectionSpec {
+  header?: HFSpec;
+  footer?: HFSpec;
+}
+
 export interface PairMeta {
   oldName: string;
   newName: string;
@@ -564,6 +579,9 @@ export interface PairMeta {
   newParts?: Partial<Record<FingerprintedPart, string>>;
   oldRevisions?: RevisionInfo;
   newRevisions?: RevisionInfo;
+  /** Headers/footers per section, in order (sections are delimited by P(..., { sectionBreak: true })). */
+  oldSections?: SectionSpec[];
+  newSections?: SectionSpec[];
   oldComments?: number;
   newComments?: number;
   pendingRevisionsInNew?: number;
@@ -586,8 +604,6 @@ interface AddDiff {
 }
 
 const PART_LABEL: Record<FingerprintedPart, string> = {
-  header: 'Headers',
-  footer: 'Footers',
   footnotes: 'Footnote text',
   endnotes: 'Endnote text',
   images: 'Images',
@@ -656,6 +672,7 @@ export class PairBuilder extends Container {
       sizeBytes: 2000 + JSON.stringify(blocks).length,
       blocks,
       partFingerprints: (side === 'old' ? m.oldParts : m.newParts) ?? {},
+      sections: sectionsOf(blocks, (side === 'old' ? m.oldSections : m.newSections) ?? []),
       revisions: (side === 'old' ? m.oldRevisions : m.newRevisions) ?? { accepted: [], unsupported: [] },
       commentCount: (side === 'old' ? m.oldComments : m.newComments) ?? 0,
     });
@@ -763,6 +780,9 @@ export class PairBuilder extends Container {
     const items: ScopeItem[] = rows
       .filter(([, , k]) => a[k] + b[k] > 0 || k === 'paragraphs')
       .map(([element, status, k]) => ({ element, status, oldCount: a[k], newCount: b[k] }));
+    const hfCount = (d: DocModel) =>
+      d.sections.reduce((k, sec) => k + [...Object.values(sec.headers), ...Object.values(sec.footers)].filter((r) => r && !r.linkedToPrevious).length, 0);
+    if (hfCount(o) + hfCount(n) > 0) items.push({ element: 'Headers and footers', status: 'detectedOnly', oldCount: hfCount(o), newCount: hfCount(n) });
     items.push({ element: 'Comments', status: 'notSupported', oldCount: o.commentCount, newCount: n.commentCount });
     items.push(...(this.meta.extraScope ?? []));
 
@@ -781,6 +801,7 @@ export class PairBuilder extends Container {
     return {
       items,
       fingerprints,
+      sectionHints: sectionHints(o.sections, n.sections),
       formatting: 'notChecked',
       unsupportedRevisions: [
         ...o.revisions.unsupported.map((u) => ({ side: 'old' as const, type: u.type, location: u.location })),
@@ -799,4 +820,60 @@ function commonCategory(hunks: WordHunk[]) {
   if (hunks.length === 0) return undefined;
   const c = hunks[0].category;
   return c && hunks.every((h) => h.category === c) ? c : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Sections, headers and footers
+// ---------------------------------------------------------------------------
+
+const VARIANTS: HeaderVariant[] = ['default', 'first', 'even'];
+
+function sectionsOf(blocks: Block[], specs: SectionSpec[]): DocSection[] {
+  const out: DocSection[] = [];
+  const start = (firstBlockId?: string) => {
+    const i = out.length;
+    const spec = specs[i] ?? {};
+    const refs = (hf: HFSpec | undefined, prev: Partial<Record<HeaderVariant, HeaderFooterRef>> | undefined) => {
+      const m: Partial<Record<HeaderVariant, HeaderFooterRef>> = {};
+      const byVariant = typeof hf === 'string' ? { default: hf } : (hf ?? {});
+      for (const v of VARIANTS) {
+        const text = byVariant[v];
+        if (text === undefined) continue;
+        if (text === 'linked') {
+          if (prev?.[v]) m[v] = { fingerprint: prev[v]!.fingerprint, linkedToPrevious: true };
+        } else m[v] = { fingerprint: hash(text) };
+      }
+      return m;
+    };
+    const prev = out.at(-1);
+    out.push({ index: i + 1, firstBlockId, headers: refs(spec.header, prev?.headers), footers: refs(spec.footer, prev?.footers) });
+  };
+  start(blocks[0]?.id);
+  blocks.forEach((b, i) => {
+    if (b.kind === 'paragraph' && b.sectionBreak) {
+      out.at(-1)!.breakBlockId = b.id;
+      start(blocks[i + 1]?.id);
+    }
+  });
+  return out;
+}
+
+/** Mock pairing: sections by index. The engine pairs them by where their breaks align. */
+function sectionHints(o: DocSection[], n: DocSection[]): SectionHint[] {
+  const hints: SectionHint[] = [];
+  for (let i = 0; i < Math.max(o.length, n.length); i++) {
+    const a = o[i];
+    const b = n[i];
+    for (const part of ['header', 'footer'] as const) {
+      const key = part === 'header' ? 'headers' : 'footers';
+      for (const v of VARIANTS) {
+        const x = a?.[key][v];
+        const y = b?.[key][v];
+        if (!x && !y) continue;
+        const result: SectionHint['result'] = !a ? 'onlyNew' : !b ? 'onlyOld' : x?.fingerprint === y?.fingerprint ? 'same' : 'mayDiffer';
+        hints.push({ part, variant: v, oldSection: a?.index, newSection: b?.index, result });
+      }
+    }
+  }
+  return hints;
 }

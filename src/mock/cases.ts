@@ -13,7 +13,7 @@ export function case01(): DiffResult {
     H(1, 'Introduction'),
     P('This document describes the design of a randomized, double-blind study of Compound X in adults with moderate hypertension.'),
   );
-  // Consecutive changed paragraphs form ONE difference (spec §7.2).
+  // A run of consecutive changes: each modified paragraph is its own difference (decision A2).
   b.grouped((g) =>
     g
       .modified(
@@ -203,15 +203,20 @@ export function case05(): DiffResult {
   const b = new PairBuilder({
     oldName: '05-uncompared-and-comments_old.docx',
     newName: '05-uncompared-and-comments_new.docx',
+    oldSections: [{ header: 'Protocol CX-201 - Confidential', footer: 'Page {PAGE} of {NUMPAGES}' }],
+    // New: a section break on "End of main protocol." starts a landscape appendix whose
+    // header and footer are linked to the previous section.
+    newSections: [
+      { header: 'Protocol CX-201 v2.0 - Confidential', footer: 'Page {PAGE} of {NUMPAGES}' },
+      { header: { default: 'linked' }, footer: { default: 'linked' } },
+    ],
     oldParts: {
-      header: hash('Protocol CX-201 - Confidential'),
       footnotes: hash('HEM-907'),
       images: hash('red'),
       hyperlinkUrls: hash('old-label'),
       properties: hash('props'),
     },
     newParts: {
-      header: hash('Protocol CX-201 v2.0 - Confidential'),
       footnotes: hash('HEM-907XL|averaged'),
       images: hash('blue'),
       hyperlinkUrls: hash('label-2026'),
@@ -225,7 +230,6 @@ export function case05(): DiffResult {
       unsupported: [{ type: 'Section and page setup change', location: 'Paragraph "End of main protocol."' }],
     },
     extraScope: [
-      { element: 'Headers and footers', status: 'detectedOnly', oldCount: 1, newCount: 1 },
       { element: 'Footnote text', status: 'detectedOnly', oldCount: 1, newCount: 2 },
       { element: 'Hyperlink addresses', status: 'detectedOnly', oldCount: 1, newCount: 1 },
       { element: 'Document properties', status: 'detectedOnly', oldCount: 1, newCount: 1 },

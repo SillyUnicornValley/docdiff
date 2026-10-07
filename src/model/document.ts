@@ -178,16 +178,42 @@ export type Block = ParagraphBlock | TableBlock | PlaceholderBlock;
 // Whole document
 // ---------------------------------------------------------------------------
 
-/** Parts of the file outside the body that are "detected only" (spec §6.3). */
+/**
+ * Parts of the file outside the body that are "detected only" (spec §6.3).
+ * Headers and footers are per section, see DocSection.
+ */
 export type FingerprintedPart =
-  | 'header'
-  | 'footer'
   | 'footnotes'
   | 'endnotes'
   | 'images'
   | 'hyperlinkUrls'
   | 'textBoxes'
   | 'properties';
+
+/** Word keeps up to three headers (and footers) per section. */
+export type HeaderVariant = 'default' | 'first' | 'even';
+
+export interface HeaderFooterRef {
+  /** Fingerprint of the header/footer text (detected only, not compared item by item). */
+  fingerprint: string;
+  /** No own header here: Word's "Link to Previous" reuses the previous section's. */
+  linkedToPrevious?: boolean;
+}
+
+/**
+ * A document section. In Word a section break (sectPr) is stored on the LAST
+ * paragraph of the section; the last section's settings belong to the body.
+ */
+export interface DocSection {
+  /** 1-based, in document order. */
+  index: number;
+  /** First top-level block of the section (where its marker is shown). */
+  firstBlockId?: NodeId;
+  /** Paragraph carrying this section's break; absent for the last section. */
+  breakBlockId?: NodeId;
+  headers: Partial<Record<HeaderVariant, HeaderFooterRef>>;
+  footers: Partial<Record<HeaderVariant, HeaderFooterRef>>;
+}
 
 export interface RevisionInfo {
   /** Revisions accepted on load, by type. */
@@ -204,6 +230,7 @@ export interface DocModel {
   sizeBytes: number;
   blocks: Block[];
   partFingerprints: Partial<Record<FingerprintedPart, string>>;
+  sections: DocSection[];
   revisions: RevisionInfo;
   /** Number of comments (shown in scope panel; not compared). */
   commentCount: number;

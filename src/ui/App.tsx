@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { mockForFiles, type MockPair } from '../mock';
 import type { DiffResult } from '../model/diff';
 import { invertResult } from '../model/invert';
-import { emptyReview, type Review } from '../model/reviewOps';
+import { applyChoices, emptyReview, type Review } from '../model/reviewOps';
+import { readAutosave, writeAutosave } from './autosave';
 import { CompareView } from './CompareView';
 import { ConfirmDialog, Toasts, useToasts, type ConfirmRequest } from './kit';
 import { SelectScreen, validateFile, type Slot } from './SelectScreen';
@@ -25,6 +26,7 @@ export function App() {
   const setReview = (r: Review) => {
     setReviewRaw(r);
     setDirty(true);
+    if (loaded) writeAutosave(loaded.result, r.state.choices);
   };
 
   // Warn before leaving with unsaved choices (spec §8.3).
@@ -82,7 +84,33 @@ export function App() {
       setDirty(false);
       setBusy(null);
       setScreen('compare');
+      offerRestore(result);
     }, STEPS.length * 220);
+  };
+
+  /** Offer the choices this browser autosaved for the same two files (decision A11). */
+  const offerRestore = (result: DiffResult) => {
+    const saved = readAutosave(result);
+    if (!saved) return;
+    const n = Object.keys(saved.choices).length;
+    setConfirmReq({
+      title: 'Restore your previous choices?',
+      message: (
+        <>
+          <p>
+            This browser kept <b>{n}</b> choice(s) for these two files, last saved {new Date(saved.savedAt).toLocaleString()}.
+          </p>
+          <p className="muted">If you start fresh, the kept choices are replaced as soon as you make a new choice. Browser storage is only a backup — use Progress → Save progress to keep your review safely.</p>
+        </>
+      ),
+      confirmLabel: `Restore ${n} choice(s)`,
+      cancelLabel: 'Start fresh',
+      onConfirm: () => {
+        setReviewRaw(applyChoices(emptyReview(), 'Restore autosaved choices', Object.entries(saved.choices).map(([diffId, to]) => ({ diffId, to }))));
+        setDirty(true);
+        push(`${n} choice(s) restored from this browser.`);
+      },
+    });
   };
 
   const onFile = (side: 'old' | 'new', f: File) =>

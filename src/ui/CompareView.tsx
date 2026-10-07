@@ -8,8 +8,8 @@ import { ExportDialog } from './ExportDialog';
 import { finalRowContent } from './finalView';
 import { downloadText, Popover, yyyymmdd, type ConfirmRequest } from './kit';
 import { CATEGORY_LABEL, KIND_LABEL, STATUS_LABEL } from './labels';
-import { BlockView, highlightsFor, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
-import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, type Row, type Visibility } from './rows';
+import { BlockView, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
+import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
 import { ScopePanel } from './ScopePanel';
 
 export interface ViewOptions {
@@ -73,7 +73,8 @@ export function CompareView({
   const loadRef = useRef<HTMLInputElement>(null);
 
   const ix = useMemo(() => makeIndexes(result), [result]);
-  const allRows = useMemo(() => buildRows(result, ix), [result, ix]);
+  const secMarkers = useMemo(() => sectionMarkers(result), [result]);
+  const allRows = useMemo(() => withSectionRows(buildRows(result, ix), secMarkers), [result, ix, secMarkers]);
   const vis: Visibility = useMemo(
     () => ({ hiddenCategories: opts.hiddenCategories, compareToc: opts.compareToc, compareFields: opts.compareFields }),
     [opts.hiddenCategories, opts.compareToc, opts.compareFields],
@@ -92,7 +93,10 @@ export function CompareView({
   const reviewedCount = reviewable.filter((id) => review.state.choices[id]).length;
   const hiddenCount = reviewable.filter((id) => isHidden(result.differences[id], vis)).length;
 
-  const changed = useCallback((row: Row) => rowDiffIds(row).some((id) => !isHidden(result.differences[id], vis)), [result, vis]);
+  const changed = useCallback(
+    (row: Row) => row.kind === 'section' || rowDiffIds(row).some((id) => !isHidden(result.differences[id], vis)),
+    [result, vis],
+  );
   const rows = useMemo(
     () => foldRows(allRows, changed, { collapseUnchanged: opts.collapseUnchanged, diffsOnly: opts.diffsOnly, expanded }),
     [allRows, changed, opts.collapseUnchanged, opts.diffsOnly, expanded],
@@ -241,7 +245,7 @@ export function CompareView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey]);
 
-  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId };
+  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers };
   const actions: Actions = {
     choose,
     select: setCurrentId,
@@ -255,7 +259,8 @@ export function CompareView({
   };
   const set = <K extends keyof ViewOptions>(k: K, v: ViewOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
   const unsupported = result.scope.unsupportedRevisions.length;
-  const mayDiffer = result.scope.fingerprints.filter((f) => f.result === 'mayDiffer').length;
+  const mayDiffer =
+    result.scope.fingerprints.filter((f) => f.result === 'mayDiffer').length + result.scope.sectionHints.filter((h) => h.result !== 'same').length;
 
   return (
     <ViewContext.Provider value={ctx}>
@@ -310,7 +315,8 @@ export function CompareView({
                   >
                     Load progress…
                   </button>
-                  <div className="menu-note">{dirty ? '● You have unsaved choices.' : 'All choices saved.'}</div>
+                  <div className="menu-note">{dirty ? '● Choices not yet saved to a progress file.' : 'All choices saved to a progress file.'}</div>
+                  <div className="menu-note">Choices are also kept in this browser automatically, as a backup only.</div>
                 </div>
               )}
             </Popover>
@@ -679,6 +685,7 @@ function Spacer({ label }: { label?: string }) {
 
 function sideContent(row: Row, side: 'old' | 'new', ctx: ViewCtx): { node: ReactNode; cls: string } {
   if (row.kind === 'gap') return { node: null, cls: '' };
+  if (row.kind === 'section') return { node: row[side] ? <SectionMarkerView m={row[side]!} /> : null, cls: 'sec-cell' };
   if (row.kind === 'equal') return { node: <BlockView b={row[side]} counterpart={row[side === 'old' ? 'new' : 'old']} />, cls: '' };
   if (row.kind === 'diff') {
     const d = ctx.result.differences[row.diffId];
@@ -748,7 +755,7 @@ function AlignedRowView({ row, showFinal }: { row: Row; showFinal: boolean }) {
         ))}
       </div>
       <div className={`cell new ${n.cls}`}>{n.node}</div>
-      {showFinal && <div className="cell final">{fin ?? <div className="final-empty">— nothing in final —</div>}</div>}
+      {showFinal && <div className="cell final">{row.kind === 'section' ? null : (fin ?? <div className="final-empty">— nothing in final —</div>)}</div>}
     </div>
   );
 }
@@ -820,7 +827,8 @@ function AlignedList({ rows, showFinal, scrollerRef, topRowKey }: { rows: Row[];
 /** Sync scroll OFF: two independent panes, natural flow, no spacers. */
 function SidePanes({ rows, scrollerRef, topRowKey }: { rows: Row[]; scrollerRef: ScrollerRef; topRowKey: React.MutableRefObject<string | undefined> }) {
   const { result } = useView();
-  const hasSide = (r: Row, side: 'old' | 'new') => r.kind === 'gap' || r.kind === 'equal' || r[side].length > 0;
+  const hasSide = (r: Row, side: 'old' | 'new') =>
+    r.kind === 'gap' || r.kind === 'equal' || (r.kind === 'section' ? !!r[side] : r[side].length > 0);
   const oldRows = useMemo(() => rows.filter((r) => hasSide(r, 'old')), [rows]);
   const newRows = useMemo(() => rows.filter((r) => hasSide(r, 'new')), [rows]);
   const oldScroll = useRef<(i: number, a?: 'center' | 'start') => void>(() => {});
@@ -885,7 +893,7 @@ function SidePane({ rows, side, scrollerRef, topRowKey }: { rows: Row[]; side: '
 function FinalOnlyList({ rows, scrollerRef }: { rows: Row[]; scrollerRef: ScrollerRef }) {
   const ctx = useView();
   const a = useContext(ActionsContext);
-  const items = useMemo(() => rows.map((r, i) => ({ r, i })), [rows]);
+  const items = useMemo(() => rows.filter((r) => r.kind !== 'section').map((r, i) => ({ r, i })), [rows]);
   const { parentRef, v } = useList(
     items.map((x) => x.r),
     scrollerRef,

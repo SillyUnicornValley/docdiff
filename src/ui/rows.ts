@@ -3,7 +3,7 @@
 // shorter side's empty space is the alignment spacer.
 
 import type { Block, TableBlock, TableRow } from '../model/document';
-import type { DiffId, DiffResult, Difference, NormCategory, RowSegment, Segment } from '../model/diff';
+import type { DiffId, DiffResult, Difference, NormCategory, RowSegment, SectionHint, Segment } from '../model/diff';
 import { DocIndex } from '../model/docIndex';
 
 export type Part = 'whole' | 'from' | 'to';
@@ -22,7 +22,41 @@ export type Row =
       diffIds: DiffId[];
       first: boolean;
     }
-  | { kind: 'gap'; key: string; runId: string; count: number };
+  | { kind: 'gap'; key: string; runId: string; count: number }
+  /** Header/footer marker for section 1 (later sections show theirs on the section-break line). */
+  | { kind: 'section'; key: string; old?: SectionMarker; new?: SectionMarker };
+
+export interface SectionMarker {
+  section: number;
+  hints: SectionHint[];
+}
+
+export interface SectionMarkers {
+  first: { old?: SectionMarker; new?: SectionMarker };
+  /** Marker of the section that STARTS after this section-break paragraph (ids are unique across sides). */
+  afterBreak: Map<string, SectionMarker>;
+}
+
+/** Markers only for sections where some header/footer may differ or exists on one side only. */
+export function sectionMarkers(r: DiffResult): SectionMarkers {
+  const out: SectionMarkers = { first: {}, afterBreak: new Map() };
+  for (const side of ['old', 'new'] as const) {
+    const secs = r[side].sections;
+    secs.forEach((sec, i) => {
+      const hints = r.scope.sectionHints.filter((h) => (side === 'old' ? h.oldSection : h.newSection) === sec.index);
+      if (!hints.some((h) => h.result !== 'same')) return;
+      const m = { section: sec.index, hints };
+      if (i === 0) out.first[side] = m;
+      else if (secs[i - 1].breakBlockId) out.afterBreak.set(secs[i - 1].breakBlockId!, m);
+    });
+  }
+  return out;
+}
+
+export function withSectionRows(rows: Row[], m: SectionMarkers): Row[] {
+  if (!m.first.old && !m.first.new) return rows;
+  return [{ kind: 'section', key: 'section:1', ...m.first }, ...rows];
+}
 
 export interface Indexes {
   old: DocIndex;

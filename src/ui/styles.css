@@ -57,7 +57,7 @@ button {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   min-width: 0;
 }
 
@@ -1520,5 +1520,117 @@ table.from-old-row td {
   }
   :root {
     --gutter: 132px;
+  }
+}
+
+/* section header/footer markers */
+.sec-marker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0;
+  padding: 3px 8px;
+  border: 1px dashed #8c959f;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  font: 12px/1.5 var(--ui-font);
+  color: var(--muted);
+  white-space: normal;
+}
+.sec-marker b {
+  color: var(--text);
+}
+.sec-hint {
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.sec-mayDiffer,
+.sec-onlyNew,
+.sec-onlyOld {
+  border-color: #d4a72c;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-weight: 600;
+}
+.sec-note {
+  font-style: italic;
+}
+.cell.sec-cell {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.hf-table td:not(:first-child),
+.hf-table th:not(:first-child) {
+  width: auto;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- phone width */
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+  .topbar > .spacer,
+  .legend,
+  .brand .ver {
+    display: none;
+  }
+  .topbar > .files {
+    flex-basis: 100%;
+  }
+  .colheads,
+  .row,
+  .colheads.with-final,
+  .row.with-final {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding-right: 0;
+  }
+  .colheads .gutter-head {
+    display: none;
+  }
+  .colhead {
+    padding: 4px 8px;
+  }
+  /* choice controls sit above the two versions */
+  .row > .gutter {
+    grid-column: 1 / -1;
+    order: -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border: 0;
+    padding: 6px 8px 2px;
+  }
+  .row:not(.row-chg) > .gutter {
+    display: none;
+  }
+  .row > .gutter .gctl {
+    flex: 1 1 220px;
+    margin: 0;
+  }
+  .row .cell.final,
+  .colhead.final {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px dashed var(--line);
+  }
+  .cell {
+    padding: 3px 8px 3px 18px;
+    font-size: 13.5px;
+  }
+  .cell.rejected,
+  .cell.chosen {
+    padding-right: 8px;
+    padding-top: 16px;
+  }
+  .frow {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .select {
+    padding-inline: 16px;
   }
 }

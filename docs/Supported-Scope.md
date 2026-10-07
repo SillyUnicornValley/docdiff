@@ -75,7 +75,7 @@ If the **new** file contains pending tracked changes, they will be accepted in t
 | Cross-references | **Compared** (displayed result) | |
 | Footnote and endnote references | **Compared** (marker position) | |
 | Footnote and endnote text | Detected only | |
-| Headers and footers (incl. watermarks) | Detected only | |
+| Headers and footers (incl. watermarks) | Detected only | Checked per section and per type (first page, odd/default, even pages). The **Check scope** panel lists each section; sections that may differ are also marked in the document view. |
 | Images, charts, shapes, SmartArt | Shown, not compared | Placeholder in the view; images are detected only. |
 | Text boxes | Shown, not compared | Placeholder; detected only. |
 | Equations | Shown, not compared | Placeholder. |
@@ -89,7 +89,7 @@ If the **new** file contains pending tracked changes, they will be accepted in t
 
 Every difference defaults to the **new** version. You can switch any difference to **Use old**, except in the cases below, where **Use old** is unavailable and the reason is shown.
 
-| The difference contains … | Use old available? |
+| The difference contains, on either side … | Use old available? |
 |---|---|
 | Plain text, superscript, subscript, tabs, line breaks | Yes |
 | Footnote or endnote reference | No (v1) |
@@ -120,4 +120,5 @@ Section breaks, bookmarks and comment anchors are never removed by a choice. If 
 
 - You can save your review progress to a small file and load it later with the same two documents.
 - A progress file only loads if both documents are identical to the ones it was saved with.
+- Your choices are also kept in this browser automatically, as a backup. When you open the same two documents again, docdiff offers to restore them. Browser storage can be cleared, so save a progress file for anything you need to keep.
 - Version 1 is designed for one person. Progress files are not designed to be handed from one reviewer to another.

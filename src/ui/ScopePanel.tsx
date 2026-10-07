@@ -36,9 +36,43 @@ export function ScopePanel({ result, onClose }: { result: DiffResult; onClose: (
           </div>
         </section>
 
+        {s.sectionHints.length > 0 && (
+          <section className="scope-sec">
+            <h3>Headers and footers by section (detected only)</h3>
+            <table className="scope-table hf-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Part</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.sectionHints.map((h, i) => (
+                  <tr key={i}>
+                    <td>
+                      {h.oldSection === h.newSection ? h.newSection : `old ${h.oldSection ?? '–'} / new ${h.newSection ?? '–'}`}
+                    </td>
+                    <td>
+                      {h.part === 'header' ? 'Header' : 'Footer'}
+                      {h.variant === 'first' ? ' (first page)' : h.variant === 'even' ? ' (even pages)' : ''}
+                    </td>
+                    <td>
+                      <span className={`pill pill-${h.result === 'same' ? 'same' : 'mayDiffer'}`}>
+                        {h.result === 'same' ? 'Same' : h.result === 'mayDiffer' ? 'May differ' : h.result === 'onlyNew' ? 'Section only in new' : 'Section only in old'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted">Sections whose header or footer may differ are also marked in the document view (§ Section n).</p>
+          </section>
+        )}
+
         {s.fingerprints.length > 0 && (
           <section className="scope-sec">
-            <h3>Parts outside the body (detected only)</h3>
+            <h3>Other parts outside the body (detected only)</h3>
             <ul className="fp-list">
               {s.fingerprints.map((f) => (
                 <li key={f.part} className={`fp-${f.result}`}>

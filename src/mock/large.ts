@@ -67,8 +67,8 @@ export function largeCase(): DiffResult {
     oldName: '07-long-document_old.docx',
     newName: '07-long-document_new.docx',
     lists: { L: { levels: ['1.', 'a)'] } },
-    oldParts: { header: 'h1', footer: 'f1' },
-    newParts: { header: 'h1', footer: 'f1' },
+    oldSections: [{ header: { default: 'CX-900 Protocol', first: 'Sponsor logo' }, footer: 'Page {PAGE}' }],
+    newSections: [{ header: { default: 'CX-900 Protocol', first: 'Sponsor logo' }, footer: 'Page {PAGE}' }],
     pendingRevisionsInNew: 12,
     newRevisions: { accepted: [{ type: 'Inserted and deleted text', count: 12 }], unsupported: [] },
   });

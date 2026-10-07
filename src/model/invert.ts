@@ -48,6 +48,12 @@ export function invertResult(r: DiffResult): DiffResult {
     scope: {
       ...r.scope,
       items: r.scope.items.map((i) => ({ ...i, oldCount: i.newCount, newCount: i.oldCount })),
+      sectionHints: r.scope.sectionHints.map((h) => ({
+        ...h,
+        oldSection: h.newSection,
+        newSection: h.oldSection,
+        result: h.result === 'onlyOld' ? 'onlyNew' : h.result === 'onlyNew' ? 'onlyOld' : h.result,
+      })),
       unsupportedRevisions: r.scope.unsupportedRevisions.map((u) => ({ ...u, side: u.side === 'old' ? 'new' : 'old' })),
     },
   };

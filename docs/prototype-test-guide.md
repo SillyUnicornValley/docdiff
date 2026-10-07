@@ -7,6 +7,9 @@
 
 ## 1. 打开原型
 
+**方式零：claude.ai Artifacts（手机也可以看）**：https://claude.ai/artifact/4bAK3f1LjdBEzzs49wVifg 。在这里 Save progress 不能下载文件，其余功能可用。
+
+
 **方式一：直接双击（推荐，也是将来离线使用的形态）**
 
 - 打开 `dist/index.html`。这是一个自包含的单文件，可以离线使用，也可以发布到 Posit Connect。
@@ -52,12 +55,12 @@ npm run dev
 | # | 检查 | 应该看到 |
 |---|---|---|
 | 01.1 | 左右两栏 | 左为旧版，右为新版；标题、正文使用统一阅读样式 |
-| 01.2 | 差异 #1 | `12`→`24` 只高亮这两个数字；改写句中只高亮改动的词；标题 “and Duration” 高亮。三处合为**一个**差异（见待定问题 A2） |
+| 01.2 | 差异 #1–#3 | #1 `12`→`24` 只高亮这两个数字；#2 改写句中只高亮改动的词；#3 标题 “and Duration” 高亮。三处可以分别选择 |
 | 01.3 | 新增段 “Randomization…” | 左侧为斜纹空白，写 “not in old”；其后的相同段落仍左右对齐 |
-| 01.4 | 删除段 “An interim analysis…” | 与上一段修改合为差异 #3；右侧没有该段 |
+| 01.4 | 删除段 “An interim analysis…” | 单独一个差异 #6（Deleted），右侧为斜纹空白 |
 | 01.5 | “24 hours” 加粗变红那段，以及 run 拆分那段 | **无**差异标记 |
 | 01.6 | “Safety Monitoring” | 左边是二级标题，右边是三级标题，各按自己的层级显示，**不**算差异 |
-| 01.7 | 在差异 #1 点 **Use old** | 卡片显示 “✓ Using old”；右侧淡化并标 “NOT USED”；左侧标 “✓ USED”；顶部进度变为 “Reviewed 1 / 3” |
+| 01.7 | 在差异 #1 点 **Use old** | 卡片显示 “✓ Using old”；右侧淡化并标 “NOT USED”；左侧标 “✓ USED”；顶部进度变为 “Reviewed 1 / 6” |
 | 01.8 | 点 Undo，再点 Redo | 选择被撤销、恢复；按钮悬停时显示要撤销的是哪一步 |
 
 ### 3.2 样例 02 · Lists
@@ -98,7 +101,9 @@ npm run dev
 | 05.8 | 图片 | 显示 `[Picture 1 · not compared]`，带 “may differ” |
 | 05.9 | 隐藏文字 “INTERNAL NOTE…” | 紫色虚线下划线，并作为新增内容高亮 |
 | 05.10 | 新增附录 | “End of main protocol.” 段下方标有 “Section break” |
-| 05.11 | 点 **Check scope** | 右侧面板依次列出：不支持的修订（Section and page setup change）；Formatting: Not checked；页眉、脚注、图片、超链接地址 “May differ”；文档属性 “Same”；Compared、Detected only、Shown not compared 各类元素的两版数量 |
+| 05.11 | 文档开头 | 左右各有一条 “§ Section 1 · Header · may differ · Footer · same” 标记 |
+| 05.12 | 新增附录前的 “Section break” 处 | 右侧标 “§ Section 2 · Header · section not in old · Footer · section not in old” |
+| 05.13 | 点 **Check scope** | 右侧面板依次列出：不支持的修订（Section and page setup change）；Formatting: Not checked；“Headers and footers by section” 表格（第 1 节页眉 May differ、页脚 Same，第 2 节 Section only in new）；脚注、图片、超链接地址 “May differ”；文档属性 “Same”；各类元素的两版数量 |
 
 ### 3.5 样例 06 · Alignment edge cases
 
@@ -109,8 +114,8 @@ npm run dev
 | 06.3 | 合段 | 同样是一个差异，左侧第一段末尾显示 `¶` |
 | 06.4 | 空段落 | 显示为 “¶ empty paragraph”，差异卡片标 “Empty paragraphs” 类别 |
 | 06.5 | “Protocol deviations…” | 移动差异：原位置在 Visits 开头，新位置在末尾 |
-| 06.6 | Typography（#7） | 直引号→弯引号、`-`→`–`、双空格→单空格、空格→不换行空格（显示为 `°`）、`Week`→`week` 都有高亮，且带虚线框（类别标记） |
-| 06.7 | View → 取消勾选 Whitespace、Quote style、Dash style、Letter case | #7 整个消失，顶部显示 “· 1 hidden”；#8 中软回车的高亮消失，上标变化仍在 |
+| 06.6 | Typography（#7–#11） | 每段一个差异：直引号→弯引号、`-`→`–`、双空格→单空格、空格→不换行空格（显示为 `°`）、`Week`→`week`。都有高亮和虚线框，卡片上标出类别 |
+| 06.7 | View → 取消勾选 Whitespace、Quote style、Dash style、Letter case | #7–#11 和软回车那一处（#14）都隐藏，顶部显示 “· 6 hidden”；上标变化（#12、#13）仍显示 |
 | 06.8 | 上标 `10⁶`→`10⁵`、`kg/m²`→`kg/m2` | 作为内容差异高亮，不属于任何可隐藏类别 |
 | 06.9 | Rewrites | 完全改写的句子整句高亮，不做零碎拼接；约 120 词的长段只高亮 `5`→`10` |
 
@@ -137,6 +142,7 @@ npm run dev
 | G.6 | Formatting 标签 | 只显示说明 “Formatting: not checked”，不会出现“无格式差异” |
 | G.7 | Progress → Save progress… | 下载一个 `…_review_YYYYMMDD.json` |
 | G.8 | 刷新页面，打开同一个样例，Progress → Load progress… 选择刚才的文件 | 所有选择恢复 |
+| G.8b | 做几处选择后刷新页面，再打开同一个样例 | 弹出 “Restore your previous choices?”，可选 Restore 或 Start fresh（浏览器本地自动保存） |
 | G.9 | 打开另一个样例，载入 G.7 的文件 | 拒绝载入，红色提示说明是哪份文件不一致 |
 | G.10 | 做了选择但没有保存，关闭或刷新页面 | 浏览器弹出“离开此页？”提示 |
 | G.11 | 有选择时点 Change files，再换文件、交换或打开另一个样例 | 先弹出确认框，说明会清空几处选择 |

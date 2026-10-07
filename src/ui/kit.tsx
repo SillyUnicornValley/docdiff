@@ -52,6 +52,7 @@ export interface ConfirmRequest {
   title: string;
   message: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
 }
@@ -64,7 +65,7 @@ export function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: 
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {req.cancelLabel ?? 'Cancel'}
           </button>
           <button
             className={`btn ${req.danger ? 'btn-danger' : 'btn-primary'}`}

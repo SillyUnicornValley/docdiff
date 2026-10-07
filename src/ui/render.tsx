@@ -6,7 +6,7 @@ import type { Block, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, 
 import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { Choice } from '../model/review';
-import { isHidden, type Indexes, type Visibility } from './rows';
+import { isHidden, type Indexes, type SectionMarker, type SectionMarkers, type Visibility } from './rows';
 
 // ---------------------------------------------------------------------------
 // Context
@@ -19,6 +19,7 @@ export interface ViewCtx {
   choices: Record<string, Choice>;
   currentId?: string;
   onSelectDiff?: (id: string) => void;
+  sections: SectionMarkers;
 }
 
 export const ViewContext = createContext<ViewCtx>(null as unknown as ViewCtx);
@@ -139,7 +140,7 @@ function placeholderFingerprints(p?: ParagraphBlock) {
 }
 
 export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]; counterpart?: ParagraphBlock }) {
-  const { vis } = useView();
+  const { vis, sections } = useView();
   const { pieces, text } = flattenParagraph(p);
   const other = placeholderFingerprints(counterpart);
   let phIndex = 0;
@@ -207,6 +208,29 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
           ⸺ Section break ⸺
         </span>
       )}
+      {p.sectionBreak && sections.afterBreak.get(p.id) && <SectionMarkerView m={sections.afterBreak.get(p.id)!} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section header/footer markers
+// ---------------------------------------------------------------------------
+
+const VARIANT_LABEL = { default: '', first: ' (first page)', even: ' (even pages)' } as const;
+const RESULT_LABEL = { same: 'same', mayDiffer: 'may differ', onlyOld: 'section not in new', onlyNew: 'section not in old' } as const;
+
+export function SectionMarkerView({ m }: { m: SectionMarker }) {
+  return (
+    <div className="sec-marker" title="Headers and footers are detected only: docdiff tells you whether they may differ, not what changed. Check in Word.">
+      <b>§ Section {m.section}</b>
+      {m.hints.map((h, i) => (
+        <span key={i} className={`sec-hint sec-${h.result}`}>
+          {h.part === 'header' ? 'Header' : 'Footer'}
+          {VARIANT_LABEL[h.variant]} · {RESULT_LABEL[h.result]}
+        </span>
+      ))}
+      <span className="sec-note">not compared item by item · check in Word</span>
     </div>
   );
 }

@@ -90,7 +90,7 @@ function FinalNestedRow({ r }: { r: RowSegment }) {
 /** Final content for one aligned row, or null when the row contributes nothing. */
 export function finalRowContent(row: Row, ctx: ReturnType<typeof useView>): ReactNode | null {
   const { result, ix, choices } = ctx;
-  if (row.kind === 'gap') return null;
+  if (row.kind === 'gap' || row.kind === 'section') return null;
   if (row.kind === 'equal') return <BlockView b={row.new} />;
   if (row.kind === 'diff') {
     const d = result.differences[row.diffId];
