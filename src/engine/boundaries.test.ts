@@ -54,3 +54,18 @@ describe('unsupported revision types (spec §5)', () => {
     expect(r.scope.pendingRevisionsInNew).toBe(2);
   });
 });
+
+describe('large changed regions (stage2-design M5)', () => {
+  it('pairs every paragraph when a term changed in all of them', async () => {
+    const words = ['dose', 'visit', 'sample', 'safety', 'review', 'site', 'data', 'report', 'week', 'blood'];
+    const para = (i: number, sponsor: string) =>
+      p(`${sponsor} ${Array.from({ length: 12 }, (_, k) => words[(i * 7 + k * 3) % words.length]).join(' ')} item ${i}.`);
+    const n = 300; // 300 × 300 cells: above the full-table limit, so the diagonal band is used
+    const oldBody = Array.from({ length: n }, (_, i) => para(i, 'J&amp;J Innovative Medicine')).join('');
+    const newBody = Array.from({ length: n }, (_, i) => para(i, 'J&amp;J IM')).join('');
+    const r = await compare(oldBody, newBody);
+    const kinds = Object.values(r.differences).map((d) => d.kind);
+    expect(kinds.filter((k) => k === 'modified')).toHaveLength(n);
+    expect(kinds.filter((k) => k !== 'modified')).toEqual([]);
+  });
+});
