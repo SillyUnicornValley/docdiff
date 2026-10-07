@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { MOCK_PAIRS, type MockPair } from '../mock';
+import { SAMPLE_PAIRS, type SamplePair } from '../samples';
 import { APP_VERSION, BUILD_DATE } from '../version';
 
 export interface Slot {
@@ -9,6 +10,9 @@ export interface Slot {
   /** The chosen file. Absent for sample pairs, which load mock data. */
   file?: File;
 }
+
+/** ?mock in the URL shows the hand-written mock pairs instead of the built-in test documents. */
+const MOCK_MODE = new URLSearchParams(location.search).has('mock');
 
 export function validateFile(name: string): string | undefined {
   const ext = name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] ?? '';
@@ -90,7 +94,7 @@ export function SelectScreen({
   onClear: (side: 'old' | 'new') => void;
   onSwap: () => void;
   onCompare: () => void;
-  onSample: (p: MockPair) => void;
+  onSample: (p: SamplePair | MockPair) => void;
   canResume: boolean;
 }) {
   const ready = slots.old && slots.new && !slots.old.error && !slots.new.error;
@@ -122,15 +126,11 @@ export function SelectScreen({
           <button className="btn btn-primary btn-big" disabled={!ready} onClick={onCompare}>
             {canResume ? 'Back to comparison' : 'Compare'}
           </button>
-          <span className="muted">
-            Preview build: paragraphs and tables are compared word by word. Placeholders, comments and the scope options are still being finished, so some of
-            these may not be detected yet.
-          </span>
         </div>
 
-        <h2>Sample pairs (mock data)</h2>
+        <h2>{MOCK_MODE ? 'Sample pairs (mock data, for UI work)' : 'Sample pairs (test documents)'}</h2>
         <div className="samples">
-          {MOCK_PAIRS.map((p) => (
+          {(MOCK_MODE ? MOCK_PAIRS : SAMPLE_PAIRS).map((p) => (
             <button key={p.id} className="sample" onClick={() => onSample(p)}>
               <div className="sample-title">{p.title}</div>
               <div className="sample-desc">{p.description}</div>

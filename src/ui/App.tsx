@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { COMPARE_STEPS, compareFiles, DocxError } from '../engine';
 import { mockForFiles, type MockPair } from '../mock';
+import { sampleFiles, type SamplePair } from '../samples';
 import type { DiffResult } from '../model/diff';
 import { invertResult } from '../model/invert';
 import { applyChoices, emptyReview, type Review } from '../model/reviewOps';
@@ -141,9 +142,14 @@ export function App() {
   const onFile = (side: 'old' | 'new', f: File) =>
     guarded(slots[side] ? 'Replace file' : 'Change files', () => setSlots((s) => ({ ...s, [side]: { name: f.name, size: f.size, error: validateFile(f.name), file: f } })));
 
-  const onSample = (p: MockPair) => {
-    const s: Slots = { old: { name: p.oldName }, new: { name: p.newName } };
-    guarded('Open another pair', () => {
+  /** Built-in test documents are compared for real; mock pairs (?mock, for UI work) load hand-written results. */
+  const onSample = (p: SamplePair | MockPair) => {
+    guarded('Open another pair', async () => {
+      let s: Slots = { old: { name: p.oldName }, new: { name: p.newName } };
+      if (!('build' in p)) {
+        const f = await sampleFiles(p);
+        s = { old: { name: f.old.name, size: f.old.size, file: f.old }, new: { name: f.new.name, size: f.new.size, file: f.new } };
+      }
       setSlots(s);
       setTimeout(() => runCompare(s, true), 0);
     });

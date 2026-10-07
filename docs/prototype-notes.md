@@ -45,8 +45,7 @@
 ## C. 原型的已知局限
 
 - 导出是模拟的，不生成 .docx（Stage 3）。
-- 示例对（Sample pairs）仍载入 mock 数据。自己选择的文件按真实内容读取和比较（Stage 2 起）。
-- 示例对的文件“指纹”是对 mock 内容的哈希；真实文件是文件字节的 SHA-256。
+- 首页示例对是内置的 testdocs 01–07，按真实内容比较（Stage 2 M6 起）。原型的 mock 示例在网址加 `?mock` 时出现，仅供界面开发；mock 的文件“指纹”是对 mock 内容的哈希。
 - 发布在 claude.ai Artifacts 上的版本中，“Save progress” 不能下载文件（Artifacts 不允许页面下载）；本地双击 `dist/index.html` 时正常。
 - mock 中两版的节按序号配对；真实引擎应按分节符在对齐结果中的位置配对。
 
