@@ -17,6 +17,7 @@ export const CATEGORY_LABEL: Record<NormCategory, string> = {
   quotes: 'Quote style',
   dashes: 'Dash style',
   case: 'Letter case',
+  numberingText: 'Numbering text',
 };
 
 export const STATUS_LABEL: Record<ReviewStatus, string> = {

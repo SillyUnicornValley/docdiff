@@ -44,8 +44,8 @@ export type DiffKind =
   | 'tableStructure' // column / merged-cell / nested structure change: whole table
   | 'replaced'; // block type changed, e.g. paragraphs ↔ table: whole block
 
-/** Normalisation categories (spec §6.5). Shown by default, each can be hidden. */
-export type NormCategory = 'whitespace' | 'emptyParagraph' | 'quotes' | 'dashes' | 'case';
+/** Normalisation categories (spec §6.5, decision 23). Shown by default, each can be hidden. */
+export type NormCategory = 'whitespace' | 'emptyParagraph' | 'quotes' | 'dashes' | 'case' | 'numberingText';
 
 /**
  * One word-level change inside a difference: old spans ↔ new spans. Kept as

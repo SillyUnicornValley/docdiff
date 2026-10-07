@@ -43,7 +43,7 @@ import type {
 import { forEachParagraph } from '../model/docIndex';
 import { computeScope } from '../model/scope';
 import { computeUseOld } from '../model/useOld';
-import { fullSpan, wordDiff, type WordDiffOptions } from './wordDiff';
+import { commonCategory, fullSpan, wordDiff, type WordDiffOptions } from '../engine/compare/wordDiff';
 
 // ---------------------------------------------------------------------------
 // Inline helpers
@@ -661,11 +661,6 @@ function textOf(p: ParagraphBlock) {
   return p.content.map((i) => (i.type === 'text' ? i.text : '')).join('');
 }
 
-function commonCategory(hunks: WordHunk[]) {
-  if (hunks.length === 0) return undefined;
-  const c = hunks[0].category;
-  return c && hunks.every((h) => h.category === c) ? c : undefined;
-}
 
 // ---------------------------------------------------------------------------
 // Sections, headers and footers

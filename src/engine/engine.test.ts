@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 // The real engine on the testdocs pairs: same invariants as the mocks.
 
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import type { DiffResult } from '../model/diff';
+import { DocIndex } from '../model/docIndex';
+import { flattenParagraph } from '../model/flatten';
+import { describeResult } from '../testing/describe';
 import { defineInvariantTests, paragraphTexts } from '../testing/invariants';
 import { testdoc } from './testing/files';
 import { compareFiles, type CompareOutput } from './index';
 
-const PAIRS = ['01-basic-text', '02-lists', '03-tables', '04-tracked-changes', '05-uncompared-and-comments', '06-edge-alignment'];
+const PAIRS = ['01-basic-text', '02-lists', '03-tables', '04-tracked-changes', '05-uncompared-and-comments', '06-edge-alignment', '07-long-document'];
 
 const cache = new Map<string, Promise<CompareOutput>>();
 const run = (pair: string) => {
@@ -45,5 +52,134 @@ describe('engine specifics', () => {
     const els = r.scope.items.map((i) => i.element);
     expect(els).toEqual(expect.arrayContaining(['Footnote text', 'Hyperlink addresses', 'Headers and footers', 'Comments']));
     expect(r.scope.fingerprints.find((f) => f.part === 'footnotes')?.result).toBe('mayDiffer');
+  });
+});
+
+/** Text of the highlighted spans on one side of every difference of the given kinds. */
+function changedTexts(r: DiffResult, kinds: string[], side: 'old' | 'new') {
+  const ix = new DocIndex(r[side]);
+  const out: string[] = [];
+  for (const d of Object.values(r.differences)) {
+    if (!kinds.includes(d.kind)) continue;
+    for (const h of d.wordHunks)
+      for (const sp of h[side]) {
+        const b = ix.get(sp.blockId);
+        if (b?.kind === 'block' && b.node.kind === 'paragraph') out.push(flattenParagraph(b.node).text.slice(sp.start, sp.end));
+      }
+  }
+  return out;
+}
+
+const blockTexts = (r: DiffResult, kind: string, side: 'old' | 'new') => {
+  const ix = new DocIndex(r[side]);
+  return Object.values(r.differences)
+    .filter((d) => d.kind === kind)
+    .flatMap((d) => paragraphTexts(d[side].ids.map((id) => ix.block(id))));
+};
+
+describe('expected outlines (testdocs/README.md)', () => {
+  const outline = async (pair: string) => describeResult((await run(pair)).result);
+
+  it('01 basic text', async () => {
+    expect(await outline('01-basic-text')).toEqual([
+      '= Clinical Study Protocol CX-201',
+      '= Introduction',
+      '= This document describes the design of a randomized, double-blind study of Compound X in adults with moderate hypertension.',
+      '~ Participants will be treated for 12 weeks, followed by a 4-week safety follow-up period. ⟶ Participants will be treated for 24 weeks, followed by a 4-week safety follow-up period.',
+      '~ The primary objective is to evaluate the change in systolic blood pressure from baseline. ⟶ The primary objective is to assess the change in mean seated systolic blood pressure from baseline to Week 24.',
+      '~ Study Design ⟶ Study Design and Duration',
+      '= Eligible participants will be randomized in a 1:1 ratio to Compound X or placebo.',
+      '+ Randomization will be stratified by site and baseline blood pressure category.',
+      '~ Visits will occur at screening, baseline, and Weeks 2, 4, 8 and 12. ⟶ Visits will occur at screening, baseline, and Weeks 2, 4, 8, 12, 16 and 24.',
+      '- An interim analysis is not planned for this study.',
+      '= The sponsor will provide study drug in identical blister packs.',
+      '= All adverse events must be reported within 24 hours of awareness.',
+      '= The investigator is responsible for maintaining accurate source documents.',
+      '= Safety Monitoring',
+      '= A Data Monitoring Committee will review unblinded safety data every six months.',
+      '= Ethics',
+      '= The protocol will be approved by an independent ethics committee before enrollment begins.',
+      '= This protocol will be conducted in accordance with Good Clinical Practice.',
+    ]);
+  });
+
+  it('01: 12 → 24 highlights only the number', async () => {
+    const r = (await run('01-basic-text')).result;
+    expect(changedTexts(r, ['modified'], 'old')).toContain('12');
+    const d = Object.values(r.differences).find((x) => x.wordHunks.some((h) => h.new.length === 1 && h.new[0].end - h.new[0].start === 2 && h.old[0]?.end - h.old[0]?.start === 2));
+    expect(d?.wordHunks).toHaveLength(1);
+  });
+
+  it('06 alignment edge cases', async () => {
+    const o = await outline('06-edge-alignment');
+    // The deleted pair is the heading AND the paragraph after it.
+    expect(o).toContain('- Pharmacogenomics ¶ Not applicable.');
+    expect(o.filter((l) => l === '= Not applicable.')).toHaveLength(3);
+    expect(o).toContain('⇄< Protocol deviations will be documented in the trial master file.');
+    expect(o).toContain('⇄> Protocol deviations will be documented in the trial master file.');
+    expect(o.filter((l) => l.startsWith('~(splitJoin)'))).toHaveLength(2);
+    for (const c of ['quotes', 'dashes', 'whitespace', 'case']) expect(o.some((l) => l.endsWith(`{${c}}`))).toBe(true);
+    // Superscript change is content: no category.
+    expect(o.find((l) => l.startsWith('~ Viral load'))).not.toMatch(/\{/);
+    expect(o.filter((l) => l.includes('{emptyParagraph}'))).toHaveLength(2);
+  });
+
+  it('06: a complete rewrite is one whole replacement; a long paragraph highlights only the number', async () => {
+    const r = (await run('06-edge-alignment')).result;
+    const rewrite = Object.values(r.differences).find((d) => d.kind === 'modified' && d.wordHunks.length === 1 && d.wordHunks[0].old[0]?.start === 0 && d.wordHunks[0].new[0]?.start === 0);
+    expect(rewrite).toBeTruthy();
+    expect(changedTexts(r, ['modified'], 'new')).toContain('10');
+  });
+
+  it('02 lists: inserted item is not a modification of the following ones; move detected', async () => {
+    const o = await outline('02-lists');
+    expect(o).toContain('+ Diagnosis of essential hypertension for at least 3 months.');
+    expect(o).toContain('= Seated systolic blood pressure between 140 and 179 mmHg.');
+    expect(o).toContain('⇄> Known hypersensitivity to Compound X.');
+    expect(o).toContain('- History of stroke or myocardial infarction within 6 months.');
+    // A new level-1 heading starts its own difference.
+    expect(o).toContain('+ Concomitant Medications ¶ Stable doses of lipid-lowering therapy are permitted.');
+  });
+
+  it('03 tables: paragraphs → table is one replacement; a table replaced by a sentence is delete + insert', async () => {
+    const o = await outline('03-tables');
+    expect(o).toContain('~(replaced) Sponsor: Acme Pharma Ltd. ¶ CRO: Beta Research Inc. ⟶ [table 3×2]');
+    expect(o).toContain('- [table 3×2]');
+    expect(o).toContain('+ Abbreviations are defined at first use in the text.');
+  });
+
+  it('04 tracked changes: compared after accepting', async () => {
+    const o = await outline('04-tracked-changes');
+    expect(o).toContain('~ The study will enroll 120 participants across 15 sites. ⟶ The study will enroll 150 participants across 15 sites.');
+    expect(o).toContain('= This paragraph was inserted by a tracked change in the old version.');
+    expect(o.some((l) => l.startsWith('~(splitJoin) The washout period'))).toBe(true);
+    expect(o).toContain('⇄> Unblinding procedures are described in Section 9.');
+    expect(o).toContain('= Statistical Considerations');
+  });
+
+  it('07 long document: every listed change is found', async () => {
+    const r = (await run('07-long-document')).result;
+    const lines = readFileSync(join(process.cwd(), 'testdocs/docs/07-long-document_changes.txt'), 'utf8').split('\n').filter(Boolean);
+    const prefix = (l: string) => /'(.*?)\.\.\.'/.exec(l)![1];
+    const newWords = changedTexts(r, ['modified'], 'new').join(' ');
+    const inserted = blockTexts(r, 'inserted', 'new');
+    const deleted = blockTexts(r, 'deleted', 'old');
+    const moved = blockTexts(r, 'moved', 'new');
+    const missing: string[] = [];
+    for (const l of lines) {
+      if (l.startsWith('MODIFY')) {
+        const word = /-> '(.*)'$/.exec(l)![1].replace(/\.$/, '');
+        if (!newWords.includes(word)) missing.push(l);
+      } else if (l.startsWith('INSERT')) {
+        // "after paragraph starting …": the inserted paragraph itself is random text; count them.
+      } else if (l.startsWith('DELETE')) {
+        if (!deleted.some((t) => t.startsWith(prefix(l)))) missing.push(l);
+      } else if (l.startsWith('MOVE')) {
+        if (!moved.some((t) => t.startsWith(prefix(l)))) missing.push(l);
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(inserted.length).toBeGreaterThanOrEqual(lines.filter((l) => l.startsWith('INSERT')).length);
+    expect(Object.values(r.differences).filter((d) => d.kind === 'moved')).toHaveLength(2);
   });
 });

@@ -1,9 +1,8 @@
 // Engine entry point: two .docx files → DiffResult.
-// M1: real parsing + preview alignment. Later milestones swap in the full
-// comparison (M2–M4) and move it into a Web Worker (M5).
+// Tables are compared row by row from M3; the comparison moves into a Web Worker in M5.
 
 import type { DiffResult } from '../model/diff';
-import { previewCompare } from './compare/preview';
+import { compareDocs } from './compare/compare';
 import { parseDocx, type ParsedDocx } from './docx/parseDocx';
 import { DocxError } from './docx/xml';
 
@@ -46,7 +45,7 @@ export async function compareFiles(oldFile: InputFile, newFile: InputFile, onSte
   const n = await parseNamed(newFile, 'new');
   onStep(2);
   await yieldToUi();
-  const result = previewCompare(o.doc, n.doc, n.revisionCount);
+  const result = compareDocs(o.doc, n.doc, n.revisionCount);
   onStep(3);
   await yieldToUi();
   return { result, parsed: { old: o, new: n } };
