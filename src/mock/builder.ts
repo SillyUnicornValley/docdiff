@@ -32,18 +32,17 @@ import type {
   DiffKind,
   DiffResult,
   Difference,
-  FingerprintHint,
   OptionalComparison,
   RowSegment,
   ScopeItem,
   Section,
-  SectionHint,
   Segment,
   UseOldAvailability,
-  UseOldBlockReason,
   WordHunk,
 } from '../model/diff';
-import { forEachBlock, forEachParagraph } from '../model/docIndex';
+import { forEachParagraph } from '../model/docIndex';
+import { computeScope } from '../model/scope';
+import { computeUseOld } from '../model/useOld';
 import { fullSpan, wordDiff, type WordDiffOptions } from './wordDiff';
 
 // ---------------------------------------------------------------------------
@@ -238,55 +237,6 @@ class SideState {
       children: s.children?.map((c) => this.para(c)),
     };
   }
-}
-
-// ---------------------------------------------------------------------------
-// "Use old" availability (spec §7.5)
-// ---------------------------------------------------------------------------
-
-const USE_OLD_MESSAGES: Record<UseOldBlockReason, string> = {
-  footnote: 'Contains a footnote reference.',
-  endnote: 'Contains an endnote reference.',
-  image: 'Contains an image or drawing.',
-  hyperlink: 'Contains a hyperlink.',
-  field: 'Contains a field (cross-reference, date, page number…).',
-  textBox: 'Contains a text box.',
-  object: 'Contains an embedded object or equation.',
-  fieldBoundary: 'A field starts or ends outside this difference.',
-  contentControlBoundary: 'A content control starts or ends outside this difference.',
-};
-
-export function useOldBlocked(reason: UseOldBlockReason): UseOldAvailability {
-  return {
-    available: false,
-    reason,
-    message: `${USE_OLD_MESSAGES[reason]} "Use old" is not available in v1 — export, then make this change in Word.`,
-  };
-}
-
-function computeUseOld(blocks: Block[]): UseOldAvailability {
-  let reason: UseOldBlockReason | undefined;
-  const ph: Partial<Record<InlinePlaceholderKind, UseOldBlockReason>> = {
-    footnoteRef: 'footnote',
-    endnoteRef: 'endnote',
-    image: 'image',
-    chart: 'image',
-    shape: 'image',
-    textBox: 'textBox',
-    equation: 'object',
-    object: 'object',
-  };
-  forEachBlock(blocks, (b) => {
-    if (reason) return;
-    if (b.kind === 'placeholder' && b.element !== 'toc') reason = b.element === 'textBox' ? 'textBox' : b.element === 'equation' || b.element === 'object' ? 'object' : 'image';
-    if (b.kind !== 'paragraph') return;
-    for (const i of b.content) {
-      if (i.type === 'hyperlink') reason ??= 'hyperlink';
-      else if (i.type === 'field') reason ??= 'field';
-      else if (i.type === 'placeholder' && ph[i.kind]) reason ??= ph[i.kind];
-    }
-  });
-  return reason ? useOldBlocked(reason) : { available: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -605,14 +555,6 @@ interface AddDiff {
   sectionId?: string;
 }
 
-const PART_LABEL: Record<FingerprintedPart, string> = {
-  footnotes: 'Footnote text',
-  endnotes: 'Endnote text',
-  images: 'Images',
-  hyperlinkUrls: 'Hyperlink addresses',
-  textBoxes: 'Text boxes',
-  properties: 'Document properties',
-};
 
 export class PairBuilder extends Container {
   oldSide: SideState;
@@ -711,106 +653,7 @@ export class PairBuilder extends Container {
   }
 
   private scope(o: DocModel, n: DocModel): CheckScope {
-    const count = (d: DocModel) => {
-      const c = {
-        paragraphs: 0,
-        listItems: 0,
-        autoNumbers: 0,
-        tables: 0,
-        rows: 0,
-        cells: 0,
-        sup: 0,
-        hiddenRuns: 0,
-        footnoteRefs: 0,
-        images: 0,
-        fields: 0,
-        crossRefs: 0,
-        hyperlinks: 0,
-        toc: 0,
-        textBoxes: 0,
-        equations: 0,
-      };
-      forEachBlock(d.blocks, (b) => {
-        if (b.kind === 'table') {
-          c.tables++;
-          c.rows += b.rows.length;
-          c.cells += b.rows.reduce((k, r) => k + r.cells.length, 0);
-        } else if (b.kind === 'placeholder') {
-          if (b.element === 'toc') c.toc++;
-          else if (b.element === 'textBox') c.textBoxes++;
-          else if (b.element === 'equation') c.equations++;
-          else c.images++;
-        } else {
-          c.paragraphs++;
-          if (b.role.type === 'listItem') c.listItems++;
-          if (b.numbering) c.autoNumbers++;
-          for (const i of b.content) {
-            if (i.type === 'text' && (i.marks?.superscript || i.marks?.subscript)) c.sup++;
-            if (i.type === 'text' && i.marks?.hidden) c.hiddenRuns++;
-            if (i.type === 'hyperlink') c.hyperlinks++;
-            if (i.type === 'field') i.fieldType === 'REF' ? c.crossRefs++ : c.fields++;
-            if (i.type === 'placeholder') {
-              if (i.kind === 'footnoteRef' || i.kind === 'endnoteRef') c.footnoteRefs++;
-              else if (i.kind === 'textBox') c.textBoxes++;
-              else if (i.kind === 'equation') c.equations++;
-              else c.images++;
-            }
-          }
-        }
-      });
-      return c;
-    };
-    const a = count(o);
-    const b = count(n);
-    const rows: [string, ScopeItem['status'], keyof typeof a][] = [
-      ['Paragraphs (body text and headings)', 'compared', 'paragraphs'],
-      ['List items (text)', 'compared', 'listItems'],
-      ['Tables', 'compared', 'tables'],
-      ['Table rows', 'compared', 'rows'],
-      ['Superscript / subscript runs', 'compared', 'sup'],
-      ['Hidden text runs', 'compared', 'hiddenRuns'],
-      ['Footnote / endnote references (position)', 'compared', 'footnoteRefs'],
-      ['Cross-references (displayed result)', 'compared', 'crossRefs'],
-      ['Hyperlinks (display text)', 'compared', 'hyperlinks'],
-      ['List numbers and bullets (automatic)', 'shownNotCompared', 'autoNumbers'],
-      ['Table of contents', 'shownNotCompared', 'toc'],
-      ['Date, page and other fields', 'shownNotCompared', 'fields'],
-      ['Images, charts, shapes', 'shownNotCompared', 'images'],
-      ['Text boxes', 'shownNotCompared', 'textBoxes'],
-      ['Equations', 'shownNotCompared', 'equations'],
-    ];
-    const items: ScopeItem[] = rows
-      .filter(([, , k]) => a[k] + b[k] > 0 || k === 'paragraphs')
-      .map(([element, status, k]) => ({ element, status, oldCount: a[k], newCount: b[k] }));
-    const hfCount = (d: DocModel) =>
-      d.sections.reduce((k, sec) => k + [...Object.values(sec.headers), ...Object.values(sec.footers)].filter((r) => r && !r.linkedToPrevious).length, 0);
-    if (hfCount(o) + hfCount(n) > 0) items.push({ element: 'Headers and footers', status: 'detectedOnly', oldCount: hfCount(o), newCount: hfCount(n) });
-    items.push({ element: 'Comments', status: 'notSupported', oldCount: o.commentCount, newCount: n.commentCount });
-    items.push(...(this.meta.extraScope ?? []));
-
-    const parts = new Set<FingerprintedPart>([
-      ...(Object.keys(o.partFingerprints) as FingerprintedPart[]),
-      ...(Object.keys(n.partFingerprints) as FingerprintedPart[]),
-    ]);
-    const fingerprints: FingerprintHint[] = [...parts].map((p) => {
-      const x = o.partFingerprints[p];
-      const y = n.partFingerprints[p];
-      if (!x && !y) return { part: p, result: 'absent' };
-      if (x === y) return { part: p, result: 'same', message: `${PART_LABEL[p]}: same in both files.` };
-      return { part: p, result: 'mayDiffer', message: `${PART_LABEL[p]} may differ — not compared item by item. Check in Word.` };
-    });
-
-    return {
-      items,
-      fingerprints,
-      sectionHints: sectionHints(o.sections, n.sections),
-      formatting: 'notChecked',
-      unsupportedRevisions: [
-        ...o.revisions.unsupported.map((u) => ({ side: 'old' as const, type: u.type, location: u.location })),
-        ...n.revisions.unsupported.map((u) => ({ side: 'new' as const, type: u.type, location: u.location })),
-      ],
-      pendingRevisionsInNew: this.meta.pendingRevisionsInNew ?? 0,
-    };
+    return computeScope(o, n, { extraScope: this.meta.extraScope, pendingRevisionsInNew: this.meta.pendingRevisionsInNew });
   }
 }
 
@@ -858,24 +701,4 @@ function sectionsOf(blocks: Block[], specs: SectionSpec[]): DocSection[] {
     }
   });
   return out;
-}
-
-/** Mock pairing: sections by index. The engine pairs them by where their breaks align. */
-function sectionHints(o: DocSection[], n: DocSection[]): SectionHint[] {
-  const hints: SectionHint[] = [];
-  for (let i = 0; i < Math.max(o.length, n.length); i++) {
-    const a = o[i];
-    const b = n[i];
-    for (const part of ['header', 'footer'] as const) {
-      const key = part === 'header' ? 'headers' : 'footers';
-      for (const v of VARIANTS) {
-        const x = a?.[key][v];
-        const y = b?.[key][v];
-        if (!x && !y) continue;
-        const result: SectionHint['result'] = !a ? 'onlyNew' : !b ? 'onlyOld' : x?.fingerprint === y?.fingerprint ? 'same' : 'mayDiffer';
-        hints.push({ part, variant: v, oldSection: a?.index, newSection: b?.index, result });
-      }
-    }
-  }
-  return hints;
 }

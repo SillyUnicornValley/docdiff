@@ -11,7 +11,7 @@ A browser-only tool for comparing and merging two Word (.docx) files. It targets
 ## Status
 
 - **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). The UI decisions are recorded in `docs/prototype-notes.md`.
-- **Stage 2 (not started):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Start it only when the user says so.
+- **Stage 2 (in progress):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/stage2-design.md`. M1 (reading .docx, preview alignment of identical blocks) is done; next is M2 (paragraph alignment and word-level diff).
 
 ## Commands
 
@@ -28,6 +28,8 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 ## Architecture
 
 - `src/model/`: data model (the `DiffResult` the engine must produce, doc index, inversion)
+- `src/engine/`: the real engine — `docx/` reads a .docx into `DocModel` (accepts existing revisions first), `align/` sequence diff, `compare/` builds the `DiffResult`
+- `src/testing/`: shared test helpers (`DiffResult` invariants for mocks and the engine)
 - `src/mock/`: mock builders and cases for testdocs 01/02/03/05/06, plus a generated large mock
 - `src/ui/`: React UI (select screen, compare view, final view, scope panel, export dialog, autosave)
 - `scripts/make-artifact.mjs`: wraps the build for publishing as a claude.ai Artifact
@@ -39,6 +41,7 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 - `docs/Supported-Scope.md`: user-facing supported scope
 - `docs/design-review-v0.1.md`: issue analysis and the decision log (§5)
 - `docs/prototype-notes.md`: prototype UI decisions (A1–A12), known limits, notes for Stage 2
+- `docs/stage2-design.md`: Stage 2 technical design and milestones (technical choices are the developer's call; only user-visible behavior goes to the user)
 - `docs/prototype-test-guide.md`: manual test steps
 - `docs/dev guidance/ruler-workflow.md`: how agent instructions are managed
 

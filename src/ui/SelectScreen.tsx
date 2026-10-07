@@ -6,6 +6,8 @@ export interface Slot {
   name: string;
   size?: number;
   error?: string;
+  /** The chosen file. Absent for sample pairs, which load mock data. */
+  file?: File;
 }
 
 export function validateFile(name: string): string | undefined {
@@ -120,7 +122,10 @@ export function SelectScreen({
           <button className="btn btn-primary btn-big" disabled={!ready} onClick={onCompare}>
             {canResume ? 'Back to comparison' : 'Compare'}
           </button>
-          <span className="muted">Prototype: any chosen files load the matching mock pair (by the “01-…” prefix of the file name).</span>
+          <span className="muted">
+            Preview build: your files are read for real, but only identical paragraphs and tables are aligned — anything changed appears as deleted and inserted.
+            Word-level comparison comes next.
+          </span>
         </div>
 
         <h2>Sample pairs (mock data)</h2>

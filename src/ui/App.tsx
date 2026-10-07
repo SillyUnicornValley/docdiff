@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { COMPARE_STEPS, compareFiles, DocxError } from '../engine';
 import { mockForFiles, type MockPair } from '../mock';
 import type { DiffResult } from '../model/diff';
 import { invertResult } from '../model/invert';
@@ -10,7 +11,7 @@ import { SelectScreen, validateFile, type Slot } from './SelectScreen';
 
 type Slots = { old?: Slot; new?: Slot };
 
-const STEPS = ['Reading files', 'Accepting existing tracked changes', 'Aligning paragraphs and tables', 'Finding word-level differences'];
+const STEPS = COMPARE_STEPS;
 
 export function App() {
   const [screen, setScreen] = useState<'select' | 'compare'>('select');
@@ -65,13 +66,42 @@ export function App() {
     }
   };
 
-  const keyOf = (s: Slots) => `${s.old?.name}|${s.new?.name}`;
+  // Re-choosing a changed file with the same name gives a new key, so the pair is compared again.
+  const fileKey = (x?: Slot) => `${x?.name}:${x?.file?.size ?? ''}:${x?.file?.lastModified ?? ''}`;
+  const keyOf = (s: Slots) => `${fileKey(s.old)}|${fileKey(s.new)}`;
+
+  const showResult = (key: string, result: DiffResult) => {
+    setLoaded({ key, result });
+    setReviewRaw(emptyReview());
+    setDirty(false);
+    setBusy(null);
+    setScreen('compare');
+    offerRestore(result);
+  };
 
   const runCompare = (s: Slots, force = false) => {
     if (!s.old || !s.new) return;
     const key = keyOf(s);
     if (!force && loaded?.key === key) return setScreen('compare');
     setBusy({ step: 0 });
+    if (s.old.file && s.new.file) {
+      const [of, nf] = [s.old.file, s.new.file];
+      (async () => {
+        try {
+          const [od, nd] = await Promise.all([of.arrayBuffer(), nf.arrayBuffer()]);
+          const { result } = await compareFiles({ name: of.name, data: od }, { name: nf.name, data: nd }, (step) => setBusy({ step }));
+          showResult(key, result);
+        } catch (e) {
+          setBusy(null);
+          if (e instanceof DocxError) push(e.message);
+          else {
+            console.error(e);
+            push(`Could not compare the files (unexpected error): ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      })();
+      return;
+    }
     // Fake progress so the long-document progress UI can be judged.
     STEPS.forEach((_, i) => setTimeout(() => setBusy({ step: i }), i * 220));
     setTimeout(() => {
@@ -79,12 +109,7 @@ export function App() {
       let result = pair.build();
       const swapped = /_new\./.test(s.old!.name) && /_old\./.test(s.new!.name);
       if (swapped) result = invertResult(result);
-      setLoaded({ key, result });
-      setReviewRaw(emptyReview());
-      setDirty(false);
-      setBusy(null);
-      setScreen('compare');
-      offerRestore(result);
+      showResult(key, result);
     }, STEPS.length * 220);
   };
 
@@ -114,7 +139,7 @@ export function App() {
   };
 
   const onFile = (side: 'old' | 'new', f: File) =>
-    guarded(slots[side] ? 'Replace file' : 'Change files', () => setSlots((s) => ({ ...s, [side]: { name: f.name, size: f.size, error: validateFile(f.name) } })));
+    guarded(slots[side] ? 'Replace file' : 'Change files', () => setSlots((s) => ({ ...s, [side]: { name: f.name, size: f.size, error: validateFile(f.name), file: f } })));
 
   const onSample = (p: MockPair) => {
     const s: Slots = { old: { name: p.oldName }, new: { name: p.newName } };
