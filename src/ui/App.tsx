@@ -33,7 +33,7 @@ export function App() {
     if (loaded) writeAutosave(loaded.result, r.state.choices);
   };
 
-  // Warn before leaving with unsaved choices (spec §8.3).
+  // Warn before leaving with unsaved choices (spec/ui §4).
   useEffect(() => {
     if (!dirty || choiceCount === 0) return;
     const h = (e: BeforeUnloadEvent) => {

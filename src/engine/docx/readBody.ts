@@ -1,5 +1,5 @@
 // Read the (revision-accepted) document body into DocModel blocks, following
-// docs/stage2-design.md §2. Formatting is dropped; only content is kept.
+// docs/implementation/stage2-design.md §2. Formatting is dropped; only content is kept.
 
 import type {
   Block,
@@ -51,7 +51,7 @@ export interface BodyResult {
    * Structures spanning several blocks or rows: id → group names. "field:N" for a
    * field whose result spans paragraphs, "cc:N" for a content control around
    * several blocks or rows. A difference covering only part of a group cannot
-   * "Use old" (spec §7.6).
+   * "Use old" (spec/export §2).
    */
   groups: Map<NodeId, string[]>;
 }

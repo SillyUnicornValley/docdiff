@@ -1,4 +1,4 @@
-// Bring old-file content into the new file (spec §7.6, decisions 25–26).
+// Bring old-file content into the new file (spec/export §2, decisions 25–26).
 //
 // Restored paragraphs (deleted, moved back, split/joined, replaced):
 //  - paragraph style: same style name in the new file → else the new file's
@@ -121,7 +121,7 @@ export class Importer {
     for (const r of Array.from(root.getElementsByTagNameNS(NS.w, 'r'))) if (elementChildren(r).every((c) => isW(c, 'rPr'))) remove(r);
   }
 
-  /** Old style id → new style id (spec §7.6 lookup order), or null for the default style. */
+  /** Old style id → new style id (spec/export §2 lookup order), or null for the default style. */
   private mapStyle(oldId: string, type: string): string | null {
     const info = this.byIdOld.get(oldId);
     const byName = info ? this.byNameNew.get(`${type}:${info.name}`) : undefined;

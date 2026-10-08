@@ -185,7 +185,7 @@ describe('expected outlines (testdocs/README.md)', () => {
       // Column added; merged cell extended: whole-table choice (decision 6).
       '~(tableStructure) [table 5×4] ⟶ [table 5×5]',
       '~(tableStructure) [table 6×3] ⟶ [table 8×3]',
-      // Block type changed at the same place: one replacement (design-review §6.1 G5).
+      // Block type changed at the same place: one replacement (spec/comparison §2.2 G5).
       '~(replaced) Sponsor: Acme Pharma Ltd. ¶ CRO: Beta Research Inc. ⟶ [table 3×2]',
       '~(replaced) [table 3×2] ⟶ Abbreviations are defined at first use in the text.',
       // Nested table compared inside its cell.

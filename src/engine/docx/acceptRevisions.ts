@@ -1,4 +1,4 @@
-// "Accept all tracked changes" on a parsed part, in place (spec §5, decision 22).
+// "Accept all tracked changes" on a parsed part, in place (spec/reading, decision 22).
 // Comparison and export both work on the result, so no position mapping is needed.
 
 import { isW, NS, plainText, remove, unwrap, wAll, wChild } from './xml';
@@ -6,14 +6,14 @@ import { isW, NS, plainText, remove, unwrap, wAll, wChild } from './xml';
 export interface AcceptedRevisions {
   /** Revisions accepted, by readable type. */
   accepted: Map<string, number>;
-  /** Revision types docdiff does not fully support (spec §5): accepted anyway, reported with a location. */
+  /** Revision types docdiff does not fully support (spec/reading): accepted anyway, reported with a location. */
   unsupported: { type: string; location: string }[];
 }
 
 /** Property-change records: accepting means keeping the current properties. */
 const FORMAT_CHANGES = ['rPrChange', 'pPrChange'];
 
-/** Supported-Scope.md §2 "Not supported": still accepted the same way, but reported. */
+/** spec/reading §4 "Not supported": still accepted the same way, but reported. */
 const UNSUPPORTED: Record<string, string> = {
   cellIns: 'Inserted table cell',
   cellDel: 'Deleted table cell',

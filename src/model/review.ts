@@ -1,5 +1,5 @@
 // Review state: the user's choices, kept separate from the immutable DiffResult
-// (spec §7.3). Missing entry = unreviewed, which counts as 'new' for the result.
+// (spec/merge §2). Missing entry = unreviewed, which counts as 'new' for the result.
 
 import type { DiffId } from './diff';
 
@@ -21,7 +21,7 @@ export interface ReviewHistory {
   future: HistoryEntry[];
 }
 
-/** Saved progress file (spec §8.3). Loads only if both fingerprints match. */
+/** Saved progress file (spec/ui §4). Loads only if both fingerprints match. */
 export interface ReviewProgressFile {
   format: 'docdiff-review';
   formatVersion: 1;

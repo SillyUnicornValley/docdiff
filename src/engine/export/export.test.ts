@@ -2,7 +2,7 @@
 // Clean export (Stage 3) on every testdocs pair: for several choice patterns
 // the exported file, read again, must match the final-result preview.
 // Set DOCDIFF_EXPORT_DIR to also write the exported files (for XSD validation,
-// see docs/stage3-design.md §6).
+// see docs/implementation/stage3-design.md §6).
 
 /// <reference types="node" />
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

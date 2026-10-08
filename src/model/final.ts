@@ -1,4 +1,4 @@
-// Final result = concatenation of each segment's chosen side (spec §7.1).
+// Final result = concatenation of each segment's chosen side (spec/merge §1).
 // Unreviewed differences count as 'new'. Informational differences are always 'new'.
 
 import type { Block, NodeId, TableBlock, TableCell, TableRow } from './document';

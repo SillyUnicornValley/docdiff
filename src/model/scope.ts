@@ -1,4 +1,4 @@
-// Check scope (spec §6.3): what was compared, detected only, or shown only,
+// Check scope (spec/comparison §5): what was compared, detected only, or shown only,
 // with counts per file. Derived from the two DocModels; shared by the engine
 // and the mock builder.
 

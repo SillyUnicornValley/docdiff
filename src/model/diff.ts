@@ -13,7 +13,7 @@ export type DiffId = string;
  * A contiguous run of nodes on one side, in document order, all in the same
  * container (body, table cell, or table). Empty `ids` = nothing on this side.
  *  - unit 'block': paragraphs / tables / placeholders
- *  - unit 'row':   rows of one table (row insert/delete, spec §7.7)
+ *  - unit 'row':   rows of one table (row insert/delete, spec/comparison §4)
  */
 export interface SideRange {
   unit: 'block' | 'row';
@@ -39,18 +39,18 @@ export type DiffKind =
   | 'modified' // 1..n paragraphs ↔ 1..n paragraphs, same count, paired
   | 'inserted' // old empty
   | 'deleted' // new empty
-  | 'moved' // one difference, two locations (spec §7.4)
+  | 'moved' // one difference, two locations (spec/comparison §3)
   | 'splitJoin' // 1→n or n→1 paragraphs
   | 'tableStructure' // column / merged-cell / nested structure change: whole table
   | 'replaced'; // block type changed, e.g. paragraphs ↔ table: whole block
 
-/** Normalisation categories (spec §6.5, decision 23). Shown by default, each can be hidden. */
+/** Normalisation categories (spec/comparison §7, decision 23). Shown by default, each can be hidden. */
 export type NormCategory = 'whitespace' | 'emptyParagraph' | 'quotes' | 'dashes' | 'case' | 'numberingText';
 
 /**
  * One word-level change inside a difference: old spans ↔ new spans. Kept as
  * pairs (not just highlights) so later versions can offer word-level choice
- * (spec §7.2) and Track Changes export can reuse them.
+ * (spec/comparison §2) and Track Changes export can reuse them.
  */
 export interface WordHunk {
   old: TextSpan[];
@@ -74,7 +74,7 @@ export type UseOldAvailability =
   | { available: true }
   | { available: false; reason: UseOldBlockReason; message: string };
 
-/** Differences from optional comparisons (spec §6.4) are informational: no choice. */
+/** Differences from optional comparisons (spec/comparison §6) are informational: no choice. */
 export type OptionalComparison = 'toc' | 'fields' | 'numbering';
 
 export interface Difference {
@@ -102,7 +102,7 @@ export interface Difference {
 }
 
 // ---------------------------------------------------------------------------
-// Segments: the ordered, non-overlapping alignment (spec §7.1)
+// Segments: the ordered, non-overlapping alignment (spec/merge §1)
 // ---------------------------------------------------------------------------
 
 /** Identical content on both sides; old.ids[i] pairs with new.ids[i]. */
@@ -149,7 +149,7 @@ export interface CellPair {
 export type Segment = EqualSegment | DiffSegment | TablePairSegment;
 
 // ---------------------------------------------------------------------------
-// Check scope (spec §6.3)
+// Check scope (spec/comparison §5)
 // ---------------------------------------------------------------------------
 
 export type ScopeStatus = 'compared' | 'detectedOnly' | 'shownNotCompared' | 'notSupported';

@@ -1,4 +1,4 @@
-// Word-level comparison of paragraphs (docs/stage2-design.md §3.3): tokens,
+// Word-level comparison of paragraphs (docs/implementation/stage2-design.md §3.3): tokens,
 // similarity for pairing, and word hunks with normalisation categories.
 // Used by the engine and, for realistic spans, by the mock builder.
 

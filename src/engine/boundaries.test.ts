@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // "Use old" is blocked when a difference covers only part of a multi-paragraph
-// field or content control (spec §7.6, stage2-design §3.3).
+// field or content control (spec/export §2, stage2-design §3.3).
 
 import { describe, expect, it } from 'vitest';
 import { compareFiles } from './index';
@@ -41,7 +41,7 @@ describe('Use old boundaries', () => {
   });
 });
 
-describe('unsupported revision types (spec §5)', () => {
+describe('unsupported revision types (spec/reading)', () => {
   it('are accepted, reported with type and location, and the comparison continues', async () => {
     const cellIns = `<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:tcPr><w:cellIns w:id="1" w:author="A"/></w:tcPr>${p('Added cell')}</w:tc></w:tr></w:tbl>`;
     const sectChange = `<w:p><w:pPr><w:sectPr><w:sectPrChange w:id="2" w:author="A"><w:sectPr/></w:sectPrChange></w:sectPr></w:pPr><w:r><w:t>End of part one.</w:t></w:r></w:p>`;

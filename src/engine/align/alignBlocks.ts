@@ -1,12 +1,12 @@
 // Align two sequences of units: the blocks of a container, or the rows of a
-// table (docs/stage2-design.md §3.1, §3.2):
+// table (docs/implementation/stage2-design.md §3.1, §3.2):
 //  1. anchors: units whose content is unique on both sides (patience diff);
 //  2. Myers diff between anchors;
 //  3. in each changed gap, pair units by similarity, in order (blocks also
 //     allow 1→2..3 splits, 2..3→1 joins, and paragraphs ↔ a table);
 //  4. moves (blocks only): unpaired deleted/inserted paragraphs that match elsewhere.
 // For blocks, a lone deleted + inserted block at the same place becomes one
-// pair even when unrelated (shown as a whole replacement; design-review §6.1 G5).
+// pair even when unrelated (shown as a whole replacement; spec/comparison §2.2 G5).
 
 import type { Block, ParagraphBlock, TableRow } from '../../model/document';
 import { forEachParagraph } from '../../model/docIndex';
@@ -71,7 +71,7 @@ function parasOf(blocks: Block[]): ParagraphBlock[] {
   return out;
 }
 
-/** Paragraphs on one side, one table on the other: a block-type change (spec §7.7, "replaced"). */
+/** Paragraphs on one side, one table on the other: a block-type change (spec/comparison §4, "replaced"). */
 export function isReplacement(os: Block[], ns: Block[]) {
   const paras = (bs: Block[]) => bs.length > 0 && bs.every((b) => isPara(b) && !isEmpty(b));
   const table = (bs: Block[]) => bs.length === 1 && bs[0].kind === 'table';

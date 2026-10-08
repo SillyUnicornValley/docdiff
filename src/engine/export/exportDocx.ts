@@ -1,4 +1,4 @@
-// Stage 3: Clean .docx export (spec §8.4, docs/stage3-design.md).
+// Stage 3: Clean .docx export (spec/export §1, docs/implementation/stage3-design.md).
 //
 // The base is the NEW file with all its tracked changes accepted. Only the
 // differences set to "Use old" change it:
@@ -211,7 +211,7 @@ class Exporter {
   }
 }
 
-/** Ask Word to update fields (TOC, cross-references) when the file is opened (spec §8.4). */
+/** Ask Word to update fields (TOC, cross-references) when the file is opened (spec/export §1). */
 const SETTINGS_AFTER_UPDATE_FIELDS = [
   'hdrShapeDefaults', 'footnotePr', 'endnotePr', 'compat', 'docVars', 'rsids', 'mathPr', 'attachedSchema', 'themeFontLang',
   'clrSchemeMapping', 'doNotIncludeSubdocsInStats', 'doNotAutoCompressPictures', 'forceUpgrade', 'captions', 'readModeInkLockDown',
@@ -269,7 +269,7 @@ export async function exportClean(oldFile: ExportFile, newFile: ExportFile, resu
   await acceptOtherParts(n.pkg);
   const bytes = (await n.pkg.zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: DOCX_MIME })) as Uint8Array<ArrayBuffer>;
 
-  // Self-check (spec §8.4): the file opens, and its content matches the preview.
+  // Self-check (spec/export §1): the file opens, and its content matches the preview.
   let check: SelfCheck;
   try {
     const again = await parseDocx(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'new', 'export');

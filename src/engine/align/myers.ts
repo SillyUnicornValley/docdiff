@@ -1,4 +1,4 @@
-// Myers O(ND) sequence diff over keys (docs/stage2-design.md §3.1 step 2).
+// Myers O(ND) sequence diff over keys (docs/implementation/stage2-design.md §3.1 step 2).
 // Common prefix/suffix are trimmed first; callers keep gaps small with anchors.
 
 export type EditOp = { type: 'equal'; a: number; b: number } | { type: 'delete'; a: number } | { type: 'insert'; b: number };

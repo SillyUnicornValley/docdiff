@@ -1,6 +1,6 @@
 // Pair the sections of the two files by the content they share in the
 // alignment (not by number), then hint header/footer differences per pair
-// (decision 17, spec §6.3).
+// (decision 17, spec/comparison §5).
 //
 // Example (05): the new file adds a section break and a landscape appendix.
 // Old section 1 shares its paragraphs with new section 1; new section 2

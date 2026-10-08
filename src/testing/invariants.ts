@@ -1,5 +1,5 @@
 // Invariants every DiffResult must satisfy, from the mock or the real engine
-// (docs/stage2-design.md §6 M6). Call inside a describe block.
+// (docs/implementation/stage2-design.md §6 M6). Call inside a describe block.
 
 import { expect, it } from 'vitest';
 import type { DiffResult } from '../model/diff';

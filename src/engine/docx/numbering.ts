@@ -1,5 +1,5 @@
 // Automatic numbering: compute the label Word shows ("3.", "a)", "2.1", "•").
-// Shown only, never compared in v1 (spec §6.4).
+// Shown only, never compared in v1 (spec/comparison §6).
 
 import type { Numbering } from '../../model/document';
 import type { StyleMap } from './styles';

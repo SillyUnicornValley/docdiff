@@ -1,4 +1,4 @@
-// Two DocModels → DiffResult (docs/stage2-design.md §3). The body, table
+// Two DocModels → DiffResult (docs/implementation/stage2-design.md §3). The body, table
 // cells and nested tables all go through the same container comparison.
 
 import type { Block, DocModel, ParagraphBlock, TableBlock, TableCell, TableRow } from '../../model/document';
@@ -115,7 +115,7 @@ class Comparer {
     // Adjacent deleted (or inserted) blocks form one difference (decision 14);
     // empty paragraphs are kept apart so they can be hidden as a category, and a
     // level-1 heading starts a new difference so "this section" batch actions fit
-    // (design-review §6.1 G2–G4).
+    // (spec/comparison §2.2 G2–G4).
     let run: { kind: 'deleted' | 'inserted'; blocks: Block[]; empty: boolean } | null = null;
     const flushRun = () => {
       if (run) push(run.kind === 'deleted' ? this.changed('deleted', run.blocks, []) : this.changed('inserted', [], run.blocks));
@@ -171,7 +171,7 @@ class Comparer {
   }
 
   // -------------------------------------------------------------------------
-  // Tables (spec §7.7, stage2-design §3.2)
+  // Tables (spec/comparison §4, stage2-design §3.2)
   // -------------------------------------------------------------------------
 
   /** Row-by-row comparison, or null when the structure changed (columns, merged cells). */
@@ -186,7 +186,7 @@ class Comparer {
       if (row && row.cells.some((c) => c.vMerge !== 'none')) return null;
     }
     const rows: RowSegment[] = [];
-    // Adjacent added (or removed) rows form one difference, like paragraphs (decision 14, design-review §6.1 G7).
+    // Adjacent added (or removed) rows form one difference, like paragraphs (decision 14, spec/comparison §2.2 G7).
     let run = null as { kind: 'deleted' | 'inserted'; rows: TableRow[] } | null;
     const flushRun = () => {
       if (run) rows.push({ type: 'diff', diffId: (run.kind === 'deleted' ? this.makeDiff('deleted', run.rows, []) : this.makeDiff('inserted', [], run.rows)).id, part: 'whole' });
@@ -304,7 +304,7 @@ export interface Groups {
 
 /**
  * "Use old" is not available when a difference covers only part of a field or
- * content control that spans several blocks or rows (spec §7.6): replacing
+ * content control that spans several blocks or rows (spec/export §2): replacing
  * part of it would break the structure.
  */
 function applyBoundaries(differences: Record<string, Difference>, groups: Groups) {

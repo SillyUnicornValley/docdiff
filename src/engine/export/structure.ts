@@ -1,4 +1,4 @@
-// Structure protection when content is removed (spec §7.6, decisions 27–28).
+// Structure protection when content is removed (spec/export §2, decisions 27–28).
 //
 // Markers: bookmarks and comment ranges inside removed content move to the
 // nearest kept paragraph before it (else after it), in their original order,

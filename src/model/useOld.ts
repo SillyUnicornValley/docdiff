@@ -1,4 +1,4 @@
-// "Use old" availability (spec §7.5, decision 15): blocked when either side
+// "Use old" availability (spec/merge §3, decision 15): blocked when either side
 // contains footnotes, images, hyperlinks, fields, text boxes or objects.
 
 import type { Block, InlinePlaceholderKind } from './document';

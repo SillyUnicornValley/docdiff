@@ -6,9 +6,9 @@ A browser-only tool for comparing and merging two Word (.docx) files. It targets
 
 ## Status
 
-- **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). The UI decisions are recorded in `docs/prototype-notes.md`.
-- **Stage 2 (done, v0.2.0):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/stage2-design.md`. Milestones M1–M6 are done; sample pairs are the built-in testdocs (`src/samples.ts`), and the hand-written mocks appear with `?mock`.
-- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Not done yet: Track Changes export; difference granularity (design-review §6.1) is still to be discussed with the user.
+- **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). UI decisions A1–A12 are in `docs/decisions.md` §2.
+- **Stage 2 (done, v0.2.0):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/implementation/stage2-design.md`. Milestones M1–M6 are done; sample pairs are the built-in testdocs (`src/samples.ts`), and the hand-written mocks appear with `?mock`.
+- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Not done yet: Track Changes export; difference granularity (`docs/spec/comparison.md` §2.2) is still to be discussed with the user.
 
 ## Commands
 
@@ -34,13 +34,15 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 
 ## Key documents
 
-- `docs/Diff-Requirements-v0.2.md`: the requirements spec
-- `docs/Supported-Scope.md`: user-facing supported scope
-- `docs/design-review-v0.1.md`: issue analysis and the decision log (§5)
-- `docs/prototype-notes.md`: prototype UI decisions (A1–A12), known limits, notes for Stage 2
-- `docs/stage2-design.md`: Stage 2 technical design and milestones (technical choices are the developer's call; only user-visible behavior goes to the user)
-- `docs/stage3-design.md`: Stage 3 export rules, self-check, and how exported files are XSD-validated
-- `docs/prototype-test-guide.md`: manual test steps
+Start at `docs/overview.md` (goal, design principles, stage status, acceptance criteria, to-do list, doc index).
+
+- `docs/spec/`: current rules by topic — `scope.md` (goal, scope, deployment, acceptance criteria), `reading.md` (supported files, existing revisions and revision types), `comparison.md` (what counts as a difference, granularity G1–G12, moves, tables, not-compared elements, per-element support status), `merge.md` (merge model, review states, when "Use old" is unavailable), `export.md` (export rules, structure protection, self-check), `ui.md` (UI and review progress)
+- `docs/decisions.md`: decision log — numbered decisions 1–32 and UI decisions A1–A12; code comments cite "decision N"
+- `docs/implementation/stage2-design.md`: Stage 2 technical design and milestones (technical choices are the developer's call; only user-visible behavior goes to the user)
+- `docs/implementation/stage3-design.md`: Stage 3 export implementation, self-check, and how exported files are XSD-validated
+- `docs/archive/`: unmaintained snapshots (design review v0.1, prototype notes) and the map from old "spec §x.y" numbers to the new files
+- `docs/repo-map.md`: what each folder and file is for
+- `docs/dev guidance/prototype-test-guide.md`: manual test steps
 - `docs/dev guidance/ruler-workflow.md`: how agent instructions are managed
 
 ## Working with the user
@@ -48,7 +50,7 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 - Discuss each stage thoroughly before building it.
 - Ask for decisions as multiple-choice questions, with a recommendation.
 - Explain edge cases with concrete examples.
-- Record decisions in `docs/` (design-review §5 and prototype-notes).
+- Record each decision as one row in `docs/decisions.md` and update the matching `docs/spec/` file; update the status in `docs/overview.md` §4 when a stage or acceptance criterion changes.
 
 ## Agent instructions (Ruler)
 

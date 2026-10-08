@@ -1,4 +1,4 @@
-// "Detected only" rows of the check-scope panel (spec §6.3) for real files.
+// "Detected only" rows of the check-scope panel (spec/comparison §5) for real files.
 // The mock builder lists these by hand; the engine counts them.
 
 import type { DocModel } from '../../model/document';

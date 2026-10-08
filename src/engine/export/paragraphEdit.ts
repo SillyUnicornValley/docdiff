@@ -1,4 +1,4 @@
-// "Use old" on a modified paragraph (spec §7.6, decision 24): edit the new
+// "Use old" on a modified paragraph (spec/export §2, decision 24): edit the new
 // paragraph in place so that its text becomes the old text.
 //  - Paragraph properties, numbering and unchanged words keep the new file's formatting.
 //  - Old words that replace new words take the formatting of the words they
@@ -44,7 +44,7 @@ function tokens(chars: Char[]): { key: string; from: number; to: number }[] {
   return out;
 }
 
-/** Old paragraph text as characters with marks. Only plain content can come back (spec §7.5). */
+/** Old paragraph text as characters with marks. Only plain content can come back (spec/merge §3). */
 export function oldChars(p: ParagraphBlock): Char[] {
   const out: Char[] = [];
   for (const piece of flattenParagraph(p).pieces) {

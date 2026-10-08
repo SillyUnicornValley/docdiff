@@ -11,11 +11,11 @@ export type Side = 'old' | 'new';
 // Inline content
 // ---------------------------------------------------------------------------
 
-/** Run marks that count as content (spec §4.1). Bold/italic etc. are formatting and are dropped. */
+/** Run marks that count as content (spec/ui §1). Bold/italic etc. are formatting and are dropped. */
 export interface RunMarks {
   superscript?: boolean;
   subscript?: boolean;
-  /** Hidden text: displayed with a dotted underline and compared (spec §6.1). */
+  /** Hidden text: displayed with a dotted underline and compared (spec/scope §4.1). */
   hidden?: boolean;
 }
 
@@ -36,7 +36,7 @@ export interface BreakInline {
 
 /**
  * Hyperlink: display text is compared; the URL is "detected only", so we keep a
- * fingerprint, not the address. Its presence blocks "Use old" (spec §7.5).
+ * fingerprint, not the address. Its presence blocks "Use old" (spec/merge §3).
  */
 export interface HyperlinkInline {
   type: 'hyperlink';
@@ -111,7 +111,7 @@ export type ParagraphRole =
   | { type: 'body' }
   | { type: 'listItem'; level: number }; // 0-based list level
 
-/** Automatic numbering as Word would render it. Shown, never compared in v1 (spec §6.4). */
+/** Automatic numbering as Word would render it. Shown, never compared in v1 (spec/comparison §6). */
 export interface Numbering {
   listId: string;
   level: number;
@@ -191,7 +191,7 @@ export type Block = ParagraphBlock | TableBlock | PlaceholderBlock;
 // ---------------------------------------------------------------------------
 
 /**
- * Parts of the file outside the body that are "detected only" (spec §6.3).
+ * Parts of the file outside the body that are "detected only" (spec/comparison §5).
  * Headers and footers are per section, see DocSection.
  */
 export type FingerprintedPart =
@@ -230,7 +230,7 @@ export interface DocSection {
 export interface RevisionInfo {
   /** Revisions accepted on load, by type. */
   accepted: { type: string; count: number }[];
-  /** Revision types docdiff cannot handle; comparison continues (spec §5). */
+  /** Revision types docdiff cannot handle; comparison continues (spec/reading). */
   unsupported: { type: string; location: string; nearBlockId?: NodeId }[];
 }
 

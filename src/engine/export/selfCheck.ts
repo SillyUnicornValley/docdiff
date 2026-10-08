@@ -1,4 +1,4 @@
-// Export self-check (spec §8.4): the exported file is read again and its
+// Export self-check (spec/export §1): the exported file is read again and its
 // content compared with the final-result preview, block by block, with the
 // same content keys the comparison uses (text and content marks; formatting
 // and numbering labels are not content).
