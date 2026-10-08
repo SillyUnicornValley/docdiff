@@ -10,6 +10,7 @@ import { parseDocx, type ParsedDocx } from './docx/parseDocx';
 import { DocxError } from './docx/xml';
 
 export { DocxError };
+export { exportClean, ExportError, type ExportResult } from './export/exportDocx';
 
 export interface InputFile {
   name: string;

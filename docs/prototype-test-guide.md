@@ -1,14 +1,14 @@
 # 界面原型测试指南
 
-- 版本：v0.1.0（Stage 1 界面原型）
-- 日期：2026-10-07
-- 目的：点一遍原型，判断布局和交互是否合适。从 v0.2.0（Stage 2）起，选择的文件和首页的示例对（testdocs 01–07）都会真实读取和比较；导出仍是模拟的，不生成 .docx。原型阶段手写的 mock 示例仍可在网址后加 `?mock` 打开。
+- 版本：v0.3.0（Stage 3：真实比较 + Clean 导出）
+- 日期：2026-10-08
+- 目的：点一遍工具，判断布局、交互和导出结果是否合适。选择的文件和首页的示例对（testdocs 01–15）都会真实读取和比较；Export 会生成真实的 .docx（§5）。原型阶段手写的 mock 示例仍可在网址后加 `?mock` 打开（此时导出是模拟的）。
 - 注意：用真实引擎后，部分差异的编号和数量会与下文按 mock 写的步骤略有不同。
 - 发现的问题和想法请直接告诉我；需要决定的界面问题见 `docs/prototype-notes.md`。
 
 ## 1. 打开原型
 
-**方式零：claude.ai Artifacts（手机也可以看）**：https://claude.ai/artifact/4bAK3f1LjdBEzzs49wVifg 。在这里 Save progress 不能下载文件，其余功能可用。
+**方式零：claude.ai Artifacts（手机也可以看）**：https://claude.ai/artifact/4bAK3f1LjdBEzzs49wVifg 。在这里 Save progress 和 Export 下载文件前会先弹出确认框（Artifacts 的下载许可），其余功能相同。
 
 
 **方式一：直接双击（推荐，也是将来离线使用的形态）**
@@ -148,9 +148,23 @@ npm run dev
 | G.9 | 打开另一个样例，载入 G.7 的文件 | 拒绝载入，红色提示说明是哪份文件不一致 |
 | G.10 | 做了选择但没有保存，关闭或刷新页面 | 浏览器弹出“离开此页？”提示 |
 | G.11 | 有选择时点 Change files，再换文件、交换或打开另一个样例 | 先弹出确认框，说明会清空几处选择 |
-| G.12 | 点 Export… | 显示 Clean（可选）和 Tracked changes（灰色，以后提供）；未处理数量；Large 样例中还显示 “12 pending tracked change(s) … will be accepted”；文件名为 `<新版名>_merged_YYYYMMDD.docx`。点导出后只提示 “Prototype: no file written” |
+| G.12 | 点 Export… | 显示 Clean（可选）和 Tracked changes（灰色，以后提供）；未处理数量；新版有未决修订时显示 “N pending tracked change(s) … will be accepted”；文件名为 `<新版名>_merged_YYYYMMDD.docx`。真实导出的步骤见 §5 |
 
-## 5. 请重点给意见的地方
+## 5. 导出（Stage 3）
+
+| # | 操作 | 期望结果 |
+|---|---|---|
+| H.1 | 打开 05，所有可选的差异都点 Use old，Export… → Export | 按钮显示 “Writing and checking…”，随后下载 `05-uncompared-and-comments_new_merged_YYYYMMDD.docx`，提示 “Self-check passed” |
+| H.2 | 用 Word 打开 H.1 的文件 | 没有“无法读取的内容”提示；Word 询问是否更新域；全文只有一节、**纵向**（附录被撤回，不会变成全文横向）；新版的三条批注都还在（锚点移到相邻段落）；旧版 Carol 的批注不在 |
+| H.3 | 打开 08，全部 Use old 后导出，用 Word 打开 | “10 business days” 带下划线且仍在批注范围内；“15–25 °C” 加粗红色；m² 的 2 是上标；隐藏文字 DRAFT 恢复（显示隐藏文字时可见）；恢复的 “Retention Period” 是二级标题样式；“Record every dose.” 是圆点列表的一项；“Note:” 段落为正文样式、“Note:” 加粗 |
+| H.4 | 打开 09，只对 “Appendix B …” 那处差异点 Use old，导出并用 Word 打开 | 附录 B 消失；文档最后一节沿用前一节（横向日程表）的页面设置，页眉页脚正常 |
+| H.5 | 打开 12，不做任何选择直接导出，用 Word 打开 | 审阅窗格中没有任何修订（正文、页眉、表格中的修订都已接受）；Dan、Erin 的批注都在 |
+| H.6 | 打开 15，随意选择十几处 Use old，导出并用 Word 打开 | 文件正常打开；选择 Use old 的地方是旧版内容；页眉页脚、横向附录、图片、脚注正常 |
+| H.7 | 打开任一样例，做选择后导出两次 | 两次都成功，内容相同（导出不改动已打开的文件，可以反复导出） |
+
+请特别留意：Word 打开时有没有修复提示；带回的段落的样式、列表编号是否合理；批注和书签位置是否可以接受。
+
+## 6. 请重点给意见的地方
 
 1. 最终结果预览：第三栏和单栏切换，哪种更好用？（A1）
 2. 01 中三处改动合为一个差异，粒度是否可以接受？（A2）

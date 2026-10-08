@@ -49,6 +49,12 @@ interface UnitSpec<T> {
   pairRule(os: T[], ns: T[]): number | undefined;
   /** Paragraph that may take part in a move (blocks only). */
   movable?(u: T): boolean;
+  /**
+   * Paragraph that may move even when short, if its exact text occurs only once
+   * in each file (blocks only). "Bring all medication." moved within a list is a
+   * move; one of several "Not applicable." paragraphs is not.
+   */
+  uniqueMovable?(u: T): boolean;
   /** Lone deleted + inserted unit at the same place: pair them anyway? */
   lonePair?(o: T, n: T): boolean;
   /** Units too common to anchor an alignment (empty paragraphs, empty rows). */
@@ -85,6 +91,7 @@ const BLOCKS: UnitSpec<Block> = {
     return [...os, ...ns].every((b) => isPara(b) && !isEmpty(b)) ? SPLIT_JOIN_MIN : undefined;
   },
   movable: (b) => isPara(b) && wordCount([b]) >= MOVE_MIN_WORDS,
+  uniqueMovable: (b) => isPara(b) && !isEmpty(b),
   weak: isEmpty,
   lonePair: (o, n) => (isPara(o) && isPara(n) && !isEmpty(o) && !isEmpty(n)) || isReplacement([o], [n]) || (o.kind === 'table' && n.kind === 'table'),
 };
@@ -126,7 +133,12 @@ function rowSimilarity(os: TableRow[], ns: TableRow[]): number {
     same++;
     if (wordCount(parasOf(c.blocks)) > 0) sameText++;
   });
-  return sameText > 0 ? Math.max(words, same / a.length) : words;
+  let sim = sameText > 0 ? Math.max(words, same / a.length) : words;
+  // The first column usually names the row ("Glucose | mg/dL | 70-99" → "Glucose | mmol/L | 3.9-5.5"):
+  // the same name is enough to pair, even when every other cell changed.
+  if (cellKey(a[0]) === cellKey(b[0]) && /\p{L}.*\p{L}|\p{L}\p{N}|\p{N}\p{L}/u.test(parasOf(a[0].blocks).map((p) => flattenParagraph(p).text).join(' ')))
+    sim = Math.max(sim, PAIR_MIN);
+  return sim;
 }
 
 const ROWS: UnitSpec<TableRow> = {
@@ -327,13 +339,26 @@ function alignUnits<T>(o: T[], n: T[], spec: UnitSpec<T>): AlignOp<T>[] {
   // Step 4: moves among the remaining deleted / inserted paragraphs.
   if (spec.movable) {
     const movable = spec.movable;
-    const dels = ops.flatMap((op, k) => (op.type === 'del' && movable(op.o) ? [k] : []));
-    const inss = ops.flatMap((op, k) => (op.type === 'ins' && movable(op.n) ? [k] : []));
+    const counts = (us: T[]) => {
+      const m = new Map<string, number>();
+      for (const u of us) m.set(spec.key(u), (m.get(spec.key(u)) ?? 0) + 1);
+      return m;
+    };
+    const [countO, countN] = [counts(o), counts(n)];
+    const unique = (u: T) => !!spec.uniqueMovable?.(u) && countO.get(spec.key(u)) === 1 && countN.get(spec.key(u)) === 1;
+    const dels = ops.flatMap((op, k) => (op.type === 'del' && (movable(op.o) || unique(op.o)) ? [k] : []));
+    const inss = ops.flatMap((op, k) => (op.type === 'ins' && (movable(op.n) || unique(op.n)) ? [k] : []));
     const candidates: { d: number; i: number; s: number }[] = [];
     if (dels.length * inss.length <= MAX_GAP_CELLS)
       for (const d of dels)
         for (const i of inss) {
-          const s = simOf(spec, [(ops[d] as { o: T }).o], [(ops[i] as { n: T }).n], MOVE_MIN);
+          const [x, y] = [(ops[d] as { o: T }).o, (ops[i] as { n: T }).n];
+          if (!(movable(x) && movable(y))) {
+            // Short paragraphs: only an identical, unique text moves.
+            if (spec.key(x) === spec.key(y) && unique(x)) candidates.push({ d, i, s: 1 });
+            continue;
+          }
+          const s = simOf(spec, [x], [y], MOVE_MIN);
           if (s >= MOVE_MIN) candidates.push({ d, i, s });
         }
     candidates.sort((x, y) => y.s - x.s);

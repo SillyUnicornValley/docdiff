@@ -44,9 +44,9 @@
 
 ## C. 原型的已知局限
 
-- 导出是模拟的，不生成 .docx（Stage 3）。
-- 首页示例对是内置的 testdocs 01–07，按真实内容比较（Stage 2 M6 起）。原型的 mock 示例在网址加 `?mock` 时出现，仅供界面开发；mock 的文件“指纹”是对 mock 内容的哈希。
-- 发布在 claude.ai Artifacts 上的版本中，“Save progress” 不能下载文件（Artifacts 不允许页面下载）；本地双击 `dist/index.html` 时正常。
+- 导出已实现（Stage 3，v0.3.0），规则见 `docs/stage3-design.md`；只有 `?mock` 模式下导出仍是模拟的。
+- 首页示例对是内置的 testdocs 01–15，按真实内容比较（Stage 2 M6 起；08–15 于 2026-10-08 加入）。原型的 mock 示例在网址加 `?mock` 时出现，仅供界面开发；mock 的文件“指纹”是对 mock 内容的哈希。
+- 发布在 claude.ai Artifacts 上的版本中，“Save progress” 和 Export 通过 Artifacts 的下载许可保存文件，保存前会弹出确认框。
 - mock 中两版的节按序号配对；真实引擎应按分节符在对齐结果中的位置配对。
 
 ## D. 给 Stage 2 的备注

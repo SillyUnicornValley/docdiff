@@ -27,7 +27,7 @@ import { detectedOnlyRows } from './scopeRows';
 import { sectionHints } from './sections';
 import { commonCategory, fullSpan, similarity, wordDiff } from './wordDiff';
 
-export const ENGINE_VERSION = 'engine-3';
+export const ENGINE_VERSION = 'engine-4';
 
 const isPara = (b: Block): b is ParagraphBlock => b.kind === 'paragraph';
 const isEmptyPara = (b: Block) => isPara(b) && flattenParagraph(b).text.trim() === '';

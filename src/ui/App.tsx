@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { COMPARE_STEPS, compareFiles, DocxError } from '../engine';
+import { COMPARE_STEPS, compareFiles, DocxError, exportClean } from '../engine';
 import { mockForFiles, type MockPair } from '../mock';
 import { sampleFiles, type SamplePair } from '../samples';
 import type { DiffResult } from '../model/diff';
+import type { Choice } from '../model/review';
 import { invertResult } from '../model/invert';
 import { applyChoices, emptyReview, type Review } from '../model/reviewOps';
 import { readAutosave, writeAutosave } from './autosave';
@@ -17,7 +18,8 @@ const STEPS = COMPARE_STEPS;
 export function App() {
   const [screen, setScreen] = useState<'select' | 'compare'>('select');
   const [slots, setSlots] = useState<Slots>({});
-  const [loaded, setLoaded] = useState<{ key: string; result: DiffResult } | null>(null);
+  /** The compared pair; `files` is absent for mock data (?mock). */
+  const [loaded, setLoaded] = useState<{ key: string; result: DiffResult; files?: { old: File; new: File } } | null>(null);
   const [review, setReviewRaw] = useState<Review>(emptyReview);
   const [dirty, setDirty] = useState(false);
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
@@ -71,8 +73,8 @@ export function App() {
   const fileKey = (x?: Slot) => `${x?.name}:${x?.file?.size ?? ''}:${x?.file?.lastModified ?? ''}`;
   const keyOf = (s: Slots) => `${fileKey(s.old)}|${fileKey(s.new)}`;
 
-  const showResult = (key: string, result: DiffResult) => {
-    setLoaded({ key, result });
+  const showResult = (key: string, result: DiffResult, files?: { old: File; new: File }) => {
+    setLoaded({ key, result, files });
     setReviewRaw(emptyReview());
     setDirty(false);
     setBusy(null);
@@ -91,7 +93,7 @@ export function App() {
         try {
           const [od, nd] = await Promise.all([of.arrayBuffer(), nf.arrayBuffer()]);
           const { result } = await compareFiles({ name: of.name, data: od }, { name: nf.name, data: nd }, (step) => setBusy({ step }));
-          showResult(key, result);
+          showResult(key, result, { old: of, new: nf });
         } catch (e) {
           setBusy(null);
           if (e instanceof DocxError) push(e.message);
@@ -178,6 +180,7 @@ export function App() {
           onChangeFiles={() => setScreen('select')}
           toast={push}
           confirm={setConfirmReq}
+          exportDocx={loaded.files && ((choices: Record<string, Choice>) => exportMerged(loaded.result, loaded.files!, choices))}
         />
       )}
       {busy && (
@@ -201,4 +204,10 @@ export function App() {
       <Toasts toasts={toasts} dismiss={dismiss} />
     </>
   );
+}
+
+/** Write the merged Clean .docx from the original files (Stage 3). */
+async function exportMerged(result: DiffResult, files: { old: File; new: File }, choices: Record<string, Choice>) {
+  const [od, nd] = await Promise.all([files.old.arrayBuffer(), files.new.arrayBuffer()]);
+  return exportClean({ name: files.old.name, data: od }, { name: files.new.name, data: nd }, result, choices);
 }

@@ -1320,6 +1320,35 @@ table.from-old-row td {
   padding: 1px 6px;
   border-radius: 4px;
 }
+.export-error {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--del-bg);
+  color: var(--del);
+}
+.export-mismatch p.warn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.mismatch-examples {
+  padding-left: 18px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.mismatch-examples li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.mismatch-examples .tag {
+  font-size: 11px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
 .proto-note {
   margin-top: 10px;
   padding: 6px 10px;

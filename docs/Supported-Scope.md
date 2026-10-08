@@ -1,7 +1,7 @@
 # docdiff — What Is Supported
 
-- Version: draft for v1 (planned scope, not yet implemented)
-- Date: 2026-10-07
+- Version: v0.3.0 (comparison and Clean export implemented)
+- Date: 2026-10-08
 - Companion to: `Diff-Requirements-v0.2.md`
 
 This page lists what docdiff v1 compares, what it only shows, and what it does not handle. Anything not listed as **Compared** must not be read as "no difference".
@@ -101,20 +101,23 @@ Every difference defaults to the **new** version. You can switch any difference 
 
 When **Use old** is unavailable, export the file and make the change in Word.
 
-Section breaks, bookmarks and comment anchors are never removed by a choice. If a removed paragraph carried a section break, the break moves to the neighbouring paragraph. The page setup of the last section always comes from the new file.
+Section breaks, bookmarks and comment anchors are never removed by a choice. If a removed paragraph carried a section break, the break moves to the last kept paragraph of its section; a section with nothing left disappears. If the last section ends up empty, the document ends with the page setup of the section before it — removing a new landscape appendix does not turn the whole document landscape. Bookmarks and comment anchors in removed text move to the nearest kept paragraph. Section breaks, bookmarks and comments of the old file are never brought back.
 
 ## 5. Export
 
 | Item | Behaviour |
 |---|---|
-| Clean export | Supported. No tracked changes in the output. |
+| Clean export | Supported. No tracked changes in the output — existing tracked changes in headers, footers, footnotes and comments are accepted too. |
 | Tracked-changes export (new → final) | Planned for a later version. |
 | Base file | The new file with existing revisions accepted; only differences set to **Use old** are changed. |
 | File name | `<new file name>_merged_YYYYMMDD.docx`. The uploaded files are never overwritten. |
 | Fields | Word prompts to update fields when the file is opened, so the table of contents and cross-references refresh. |
 | Comments | Comments in the new file are kept. |
 | Formatting | The new file's styles are kept; docdiff's on-screen styling is never written to Word. |
-| Self-check | After export, docdiff re-reads the file and warns if it does not match the preview. |
+| Old text in a changed paragraph | The paragraph keeps the new file's paragraph formatting and numbering, and unchanged words keep their formatting. Old words take the formatting of the words they replace. Superscript, subscript and hidden text come back as in the old file. |
+| Old paragraph brought back | Its style is matched by name in the new file (then by heading level, then Normal). List items join the neighbouring list. Bold, italic, underline and strikethrough come back; fonts, sizes, colours and paragraph formatting follow the new file. |
+| Old table or row brought back | Keeps its own layout (column widths, borders, merged cells, shading). |
+| Self-check | After writing, docdiff re-reads the file and compares it with the final-result preview. If they match, the file downloads. If not, docdiff shows where they differ and lets you download anyway or cancel. |
 
 ## 6. Review progress
 

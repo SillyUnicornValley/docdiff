@@ -1,0 +1,23 @@
+HEADER  version 1.0 -> 2.0 and effective date (not compared; Check scope hint)
+CELL    title table: Version 1.0 -> 2.0; Effective date 2025-11-03 -> 2026-09-30
+ROW+    revision history: row for version 2.0
+TOC     entry 7 'Appendix: Forms' -> 'Appendix: Checklist' (TOC folded; shown with 'Compare table of contents')
+MODIFY  Purpose: '…capture system.' -> '…capture system and in external data sources.'
+DELETE  Scope: 'Observational studies are out of scope.'
+CELL    definitions: Query definition reworded
+ROW+    definitions: RBQM row
+MODIFY  Responsibilities: CRA sentence extended
+INSERT  Responsibilities: Central Monitor
+INSERT  Data Review step 'Check external data (laboratory, ECG) against the EDC.'
+MODIFY  Data Review step 'Raise a query…' -> 'Raise one query per discrepancy, quoting the field name.' (rewritten: shown as delete + insert)
+FOOTNOTE text changed (not compared; Check scope hint)
+MODIFY  Query Timelines: 14 -> 10 calendar days
+MODIFY  Query Timelines: 21 -> 15 days
+INSERT  Query Timelines: 'Escalations are summarized…'
+DELETE  Database Lock: 'SDV is complete.'
+INSERT  Database Lock: 'Targeted SDV is complete…' (G5: may pair with the deleted item as one modification)
+MODIFY  References: ICH E6(R2) -> ICH E6(R3)
+INSERT  References: SOP-CM-003
+MODIFY  Appendix heading 'Forms' -> 'Checklist'
+ROW+    checklist: External data reconciled
+CELL    signatures: Author J. Lee -> M. Ortiz

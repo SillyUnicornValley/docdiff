@@ -119,7 +119,28 @@ export function useToasts() {
 }
 
 export function downloadText(fileName: string, text: string, type = 'application/json') {
-  const url = URL.createObjectURL(new Blob([text], { type }));
+  void downloadBlob(fileName, new Blob([text], { type }));
+}
+
+interface ClaudeHost {
+  use(name: 'downloads'): Promise<{ save(r: { filename: string; data: Blob }): Promise<unknown> } | null>;
+}
+
+/**
+ * Save a file. Inside a claude.ai Artifact the page cannot download directly:
+ * the `downloads` capability asks the viewer to confirm instead. Everywhere
+ * else (the single HTML file, Posit Connect) a normal browser download.
+ */
+export async function downloadBlob(fileName: string, blob: Blob) {
+  const host = (window as unknown as { claude?: ClaudeHost }).claude;
+  if (host?.use) {
+    const downloads = await host.use('downloads').catch(() => null);
+    if (downloads) {
+      await downloads.save({ filename: fileName, data: blob }).catch(() => {}); // declined: nothing to do
+      return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;

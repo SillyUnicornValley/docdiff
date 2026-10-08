@@ -13,7 +13,9 @@ import { defineInvariantTests, paragraphTexts } from '../testing/invariants';
 import { testdoc } from './testing/files';
 import { compareFiles, type CompareOutput } from './index';
 
-const PAIRS = ['01-basic-text', '02-lists', '03-tables', '04-tracked-changes', '05-uncompared-and-comments', '06-edge-alignment', '07-long-document'];
+const PAIRS = ['01-basic-text', '02-lists', '03-tables', '04-tracked-changes', '05-uncompared-and-comments', '06-edge-alignment', '07-long-document',
+  '08-export-formatting', '09-sections-headers', '10-complex-tables', '11-fields-and-controls', '12-tracked-and-comments', '13-reorder-and-repeats',
+  '14-unicode-and-normalisation', '15-realistic-sop'];
 
 const cache = new Map<string, Promise<CompareOutput>>();
 const run = (pair: string) => {

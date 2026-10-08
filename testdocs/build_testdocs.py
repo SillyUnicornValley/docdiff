@@ -4,7 +4,8 @@
 Standard library only. Writes raw OOXML so that tracked changes, merged
 cells, comments, footnotes, fields and section breaks are fully controlled.
 
-Usage: python3 build_testdocs.py [output_dir]
+Usage: python3 build_testdocs.py [output_dir] [--only=08,09]
+Cases 08 and later live in build_testdocs_advanced.py.
 """
 import os
 import random
@@ -145,7 +146,7 @@ def PPR_CHANGE(author, old_style):
 
 
 # tables
-def TC(content, w, span=1, vmerge=None, shade=None):
+def TC(content, w, span=1, vmerge=None, shade=None, extra=""):
     tcpr = f'<w:tcW w:w="{w}" w:type="dxa"/>'
     if span > 1:
         tcpr += f'<w:gridSpan w:val="{span}"/>'
@@ -155,6 +156,7 @@ def TC(content, w, span=1, vmerge=None, shade=None):
         tcpr += "<w:vMerge/>"
     if shade:
         tcpr += f'<w:shd w:val="clear" w:color="auto" w:fill="{shade}"/>'
+    tcpr += extra  # e.g. a tracked cell insertion (must come last in tcPr)
     if content is None:
         body = "<w:p/>"
     elif isinstance(content, str):
@@ -183,7 +185,7 @@ def TBL(rows, widths, header=True):
         for c in cells:
             if isinstance(c, dict):
                 span = c.get("span", 1)
-                tcs += TC(c.get("c"), sum(widths[col:col + span]), span, c.get("vmerge"), c.get("shade"))
+                tcs += TC(c.get("c"), sum(widths[col:col + span]), span, c.get("vmerge"), c.get("shade"), c.get("extra", ""))
             else:
                 span = 1
                 if header and ri == 0 and isinstance(c, str):
@@ -299,14 +301,50 @@ NUMBERING = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 
 class Doc:
-    def __init__(self, header=None):
+    def __init__(self, header=None, ns_extra="", styles_extra="", style_ids=None, num_extra_abstract="",
+                 num_extra_num="", even_odd=False):
+        """ns_extra: more namespace declarations on the document root (w14, m, v…).
+        styles_extra: more w:style elements. style_ids: {"Heading1": "Ueberschrift1"} renames
+        style ids everywhere (like a localized Word). num_extra_*: more list definitions."""
         self.body = []
         self.comments = []
         self.footnotes = []
+        self.endnotes = []
         self.rels = []
         self.media = {}
         self.header = header
         self.final_page = LETTER
+        self.final_sect = None  # full w:sectPr xml for the last section (overrides header/final_page)
+        self.hf = []  # (kind, rid, file name, xml content)
+        self.ns_extra = ns_extra
+        self.styles_extra = styles_extra
+        self.style_ids = style_ids or {}
+        self.num_extra_abstract = num_extra_abstract
+        self.num_extra_num = num_extra_num
+        self.even_odd = even_odd
+
+    def add_hf(self, kind, content):
+        """A header or footer part. content: text or paragraph xml. Returns its relationship id."""
+        n = len(self.hf) + 1
+        rid = f"rIdHF{n}"
+        body = content if content.startswith("<") else P(content, style="Header")
+        self.hf.append((kind, rid, f"{kind}{n}.xml", body))
+        return rid
+
+    def sect(self, page=LETTER, hdr=None, ftr=None, title_pg=False, sect_type=None, cols=None):
+        """A w:sectPr. hdr/ftr: {"default"|"first"|"even": rid}."""
+        refs = "".join(f'<w:headerReference w:type="{t}" r:id="{rid}"/>' for t, rid in (hdr or {}).items())
+        refs += "".join(f'<w:footerReference w:type="{t}" r:id="{rid}"/>' for t, rid in (ftr or {}).items())
+        typ = f'<w:type w:val="{sect_type}"/>' if sect_type else ""
+        col = f'<w:cols w:num="{cols}" w:space="720"/>' if cols else '<w:cols w:space="720"/>'
+        return f"<w:sectPr>{refs}{typ}{page}{MARGINS}{col}{'<w:titlePg/>' if title_pg else ''}</w:sectPr>"
+
+    def endnote(self, text):
+        eid = len(self.endnotes) + 1
+        self.endnotes.append(
+            f'<w:endnote w:id="{eid}"><w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:endnoteRef/></w:r>'
+            f'{R(" " + text)}</w:p></w:endnote>')
+        return eid
 
     def add(self, *xml):
         self.body.extend(xml)
@@ -340,8 +378,9 @@ class Doc:
 
     def save(self, path):
         hdr_ref = '<w:headerReference w:type="default" r:id="rIdHdr"/>' if self.header else ""
-        sect = f"<w:sectPr>{hdr_ref}{self.final_page}{MARGINS}<w:cols w:space=\"720\"/></w:sectPr>"
-        document = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document {NS}><w:body>'
+        sect = self.final_sect or f"<w:sectPr>{hdr_ref}{self.final_page}{MARGINS}<w:cols w:space=\"720\"/></w:sectPr>"
+        ns = f"{NS} {self.ns_extra}" if self.ns_extra else NS
+        document = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document {ns}><w:body>'
                     + "".join(self.body) + sect + "</w:body></w:document>")
         rels = [f'<Relationship Id="rIdStyles" Type="{REL}/styles" Target="styles.xml"/>',
                 f'<Relationship Id="rIdNum" Type="{REL}/numbering" Target="numbering.xml"/>',
@@ -351,7 +390,10 @@ class Doc:
                      ("/word/numbering.xml", "wordprocessingml.numbering"),
                      ("/word/settings.xml", "wordprocessingml.settings"),
                      ("/docProps/core.xml", None)]
-        files = {"word/styles.xml": STYLES, "word/numbering.xml": NUMBERING}
+        styles = STYLES.replace("</w:styles>", self.styles_extra + "</w:styles>")
+        numbering = NUMBERING.replace('<w:num w:numId="1">', self.num_extra_abstract + '<w:num w:numId="1">')
+        numbering = numbering.replace("</w:numbering>", self.num_extra_num + "</w:numbering>")
+        files = {"word/styles.xml": styles, "word/numbering.xml": numbering}
         if self.comments:
             rels.append(f'<Relationship Id="rIdComments" Type="{REL}/comments" Target="comments.xml"/>')
             overrides.append(("/word/comments.xml", "wordprocessingml.comments"))
@@ -367,6 +409,21 @@ class Doc:
                 '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>'
                 + "".join(self.footnotes) + "</w:footnotes>")
             fn_pr = '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>'
+        en_pr = ""
+        if self.endnotes:
+            rels.append(f'<Relationship Id="rIdEndnotes" Type="{REL}/endnotes" Target="endnotes.xml"/>')
+            overrides.append(("/word/endnotes.xml", "wordprocessingml.endnotes"))
+            files["word/endnotes.xml"] = (
+                f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:endnotes {NS}>'
+                '<w:endnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:endnote>'
+                '<w:endnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:endnote>'
+                + "".join(self.endnotes) + "</w:endnotes>")
+            en_pr = '<w:endnotePr><w:endnote w:id="-1"/><w:endnote w:id="0"/></w:endnotePr>'
+        for kind, rid, name, body in self.hf:
+            rels.append(f'<Relationship Id="{rid}" Type="{REL}/{kind}" Target="{name}"/>')
+            overrides.append((f"/word/{name}", f"wordprocessingml.{kind}"))
+            tag = "w:hdr" if kind == "header" else "w:ftr"
+            files[f"word/{name}"] = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<{tag} {NS}>{body}</{tag}>'
         if self.header:
             rels.append(f'<Relationship Id="rIdHdr" Type="{REL}/header" Target="header1.xml"/>')
             overrides.append(("/word/header1.xml", "wordprocessingml.header"))
@@ -374,9 +431,13 @@ class Doc:
                                          + P(self.header, style="Header", jc="right") + "</w:hdr>")
         files["word/settings.xml"] = (
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:settings {NS}>'
-            f'<w:defaultTabStop w:val="720"/>{fn_pr}<w:compat><w:compatSetting w:name="compatibilityMode" '
+            f'<w:defaultTabStop w:val="720"/>{"<w:evenAndOddHeaders/>" if self.even_odd else ""}{fn_pr}{en_pr}<w:compat><w:compatSetting w:name="compatibilityMode" '
             'w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>')
         files["word/document.xml"] = document
+        for a, b in self.style_ids.items():  # localized style ids: rename everywhere
+            for k in list(files):
+                if k.endswith(".xml"):
+                    files[k] = files[k].replace(f'w:styleId="{a}"', f'w:styleId="{b}"').replace(f'w:val="{a}"', f'w:val="{b}"')
         files["word/_rels/document.xml.rels"] = (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -870,9 +931,14 @@ CASES = [
 
 
 def main():
-    out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs")
+    args = [a for a in sys.argv[1:] if not a.startswith("--only=")]
+    only = [a.split("=", 1)[1].split(",") for a in sys.argv[1:] if a.startswith("--only=")]
+    out_dir = args[0] if args else os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs")
     os.makedirs(out_dir, exist_ok=True)
-    for name, fn in CASES:
+    from build_testdocs_advanced import ADVANCED_CASES  # 08 and later (more complex documents)
+    for name, fn in CASES + ADVANCED_CASES:
+        if only and not any(name.startswith(o) for o in only[0]):
+            continue
         result = fn()
         old, new = result[0], result[1]
         old.save(os.path.join(out_dir, f"{name}_old.docx"))

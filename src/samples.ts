@@ -49,6 +49,46 @@ export const SAMPLE_PAIRS: SamplePair[] = [
     title: '07 · Long document',
     description: '60 chapters, about 150 pages, 60 tables, with about 75 changes spread through it.',
   },
+  {
+    id: '08',
+    title: '08 · Export formatting',
+    description: 'Mixed formatting, superscript and hidden text, comments, a custom style, localized style names, lists to restore.',
+  },
+  {
+    id: '09',
+    title: '09 · Sections, headers, footers',
+    description: 'Cover page, two-column and landscape sections, a removed section, odd/even headers, page X of Y footers.',
+  },
+  {
+    id: '10',
+    title: '10 · Complex tables',
+    description: 'Merged headers, vertical merges, a removed column, rich cells, nested rows, long definitions, split table.',
+  },
+  {
+    id: '11',
+    title: '11 · Fields and content controls',
+    description: 'Check box, drop-down, date and text controls, SEQ captions, cross-references, links, notes, equation, text box.',
+  },
+  {
+    id: '12',
+    title: '12 · Tracked changes and comments',
+    description: 'Pending revisions by several authors in text, lists, tables and the header; overlapping and multi-paragraph comments.',
+  },
+  {
+    id: '13',
+    title: '13 · Reordering and repetition',
+    description: 'A chapter moved, swapped paragraphs, a reordered list, repeated boilerplate and near-identical lines.',
+  },
+  {
+    id: '14',
+    title: '14 · Characters and normalisation',
+    description: 'Symbols, accents, CJK and emoji; no-break and zero-width spaces, dashes, quotes, soft and no-break hyphens.',
+  },
+  {
+    id: '15',
+    title: '15 · Realistic SOP v1.0 → v2.0',
+    description: 'A complete procedure document with history, TOC, definitions, steps, figure, footnote, landscape appendix.',
+  },
 ].flatMap((p) => {
   const base = Object.keys(FILES).find((k) => k.includes(`/${p.id}-`) && k.endsWith('_old.docx'));
   if (!base) return [];

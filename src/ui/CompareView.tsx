@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { DiffId, DiffResult, Difference, NormCategory } from '../model/diff';
 import type { Choice, ReviewStatus } from '../model/review';
 import { applyChoices, makeProgressFile, parseProgressFile, redo, statusOf, undo, type Review } from '../model/reviewOps';
+import type { ExportResult } from '../engine';
 import { APP_VERSION } from '../version';
 import { ExportDialog } from './ExportDialog';
 import { finalRowContent } from './finalView';
@@ -54,6 +55,7 @@ export function CompareView({
   onChangeFiles,
   toast,
   confirm,
+  exportDocx,
 }: {
   result: DiffResult;
   review: Review;
@@ -63,6 +65,8 @@ export function CompareView({
   onChangeFiles: () => void;
   toast: (text: string, tone?: 'info' | 'warn' | 'error') => void;
   confirm: (r: ConfirmRequest) => void;
+  /** Writes the merged .docx; absent for mock data (?mock), where export stays simulated. */
+  exportDocx?: (choices: Record<string, Choice>) => Promise<ExportResult>;
 }) {
   const [opts, setOpts] = useState<ViewOptions>(defaultViewOptions);
   const [currentId, setCurrentId] = useState<DiffId | undefined>(undefined);
@@ -445,10 +449,11 @@ export function CompareView({
               result={result}
               review={review}
               onClose={() => setShowExport(false)}
-              onExported={(name) => {
+              exportDocx={exportDocx && (() => exportDocx(review.state.choices))}
+              onExported={(message, tone) => {
                 markClean();
                 setShowExport(false);
-                toast(`Prototype: no file written. Real export would save "${name}".`);
+                toast(message, tone);
               }}
             />
           )}
