@@ -1,7 +1,7 @@
 // Diff model: what the comparison engine (Stage 2) produces for a document pair.
 // It never changes after comparison. User choices live in review.ts.
 
-import type { DocModel, FingerprintedPart, HeaderVariant, NodeId } from './document';
+import type { Block, CommentItem, DocModel, FingerprintedPart, HeaderVariant, NodeId } from './document';
 
 export type DiffId = string;
 
@@ -165,7 +165,8 @@ export type Segment = EqualSegment | DiffSegment | TablePairSegment;
 // Check scope (spec/comparison §5)
 // ---------------------------------------------------------------------------
 
-export type ScopeStatus = 'compared' | 'detectedOnly' | 'shownNotCompared' | 'notSupported';
+/** 'flagged' (Stage 5): compared and shown item by item, but not choosable. */
+export type ScopeStatus = 'compared' | 'flagged' | 'detectedOnly' | 'shownNotCompared' | 'notSupported';
 
 export interface ScopeItem {
   element: string; // "Body paragraphs", "Images", "Footnote text"...
@@ -213,6 +214,62 @@ export interface FormatChange {
   items: FormatItem[];
 }
 
+// ---------------------------------------------------------------------------
+// Other parts, compared item by item and shown only (decisions 45–46)
+// ---------------------------------------------------------------------------
+
+export type PartStatus = 'same' | 'changed' | 'onlyOld' | 'onlyNew';
+
+/** One footnote, endnote, header, footer or text box on both sides. Blocks are kept only when it differs. */
+export interface PartPair {
+  label: string;
+  status: PartStatus;
+  old: Block[];
+  new: Block[];
+  hunks: WordHunk[];
+}
+
+/** A hyperlink in paired paragraphs whose address changed. */
+export interface LinkChange {
+  text: string;
+  old: string;
+  new: string;
+  newId: NodeId;
+}
+
+/** A picture in paired paragraphs whose image data differs. */
+export interface ImageChange {
+  label: string;
+  /** Text of the paragraph holding it. */
+  text: string;
+  newId: NodeId;
+}
+
+export interface PropertyChange {
+  name: string;
+  old?: string;
+  new?: string;
+}
+
+export type CommentStatus = 'same' | 'textChanged' | 'anchorChanged' | 'onlyOld' | 'onlyNew';
+
+export interface CommentPair {
+  status: CommentStatus;
+  old?: CommentItem;
+  new?: CommentItem;
+}
+
+export interface OtherParts {
+  footnotes: PartPair[];
+  endnotes: PartPair[];
+  headersFooters: PartPair[];
+  textBoxes: PartPair[];
+  links: LinkChange[];
+  images: ImageChange[];
+  properties: PropertyChange[];
+  comments: CommentPair[];
+}
+
 export interface CheckScope {
   items: ScopeItem[];
   fingerprints: FingerprintHint[];
@@ -247,4 +304,6 @@ export interface DiffResult {
   scope: CheckScope;
   /** Formatting differences of paired content (decision 44). Absent for mock data. */
   formatChanges?: FormatChange[];
+  /** Notes, headers, footers, text boxes, links, pictures, properties, comments (decisions 45–46). Absent for mock data. */
+  otherParts?: OtherParts;
 }

@@ -17,6 +17,7 @@ import { BlockView, hasNewComment, highlightsFor, SectionMarkerView, SideSegment
 import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
 import { ScopePanel } from './ScopePanel';
 import { FormattingTab } from './FormattingTab';
+import { OtherPartsTab, otherPartsCount } from './OtherPartsTab';
 import type { Block } from '../model/document';
 import { forEachBlock } from '../model/docIndex';
 
@@ -378,6 +379,9 @@ export function CompareView({
               <button role="tab" aria-selected={tab === 'formatting'} className={tab === 'formatting' ? 'active' : ''} onClick={() => setTab('formatting')}>
                 Formatting <span className="muted">· {result.formatChanges ? result.formatChanges.length : 'not checked'}</span>
               </button>
+              <button role="tab" aria-selected={tab === 'other'} className={tab === 'other' ? 'active' : ''} onClick={() => setTab('other')}>
+                Other parts <span className="muted">· {result.otherParts ? otherPartsCount(result.otherParts) : 'not compared'}</span>
+              </button>
             </div>
             <div className="spacer" />
             <div className="progress" title={`${reviewedCount} of ${reviewable.length} differences have a choice. Unreviewed differences use the new version.`}>
@@ -468,9 +472,9 @@ export function CompareView({
               </Tip>
             )}
             {mayDiffer > 0 && (
-              <Tip tip="Parts that docdiff does not compare (such as headers, footers or images) look different in the two files. Check them in Word. Click to list them.">
-                <button className="link" onClick={() => setPanel('scope')}>
-                  {mayDiffer} not-compared part(s) may differ
+              <Tip tip="Parts outside the main text (such as notes, headers, footers or pictures) differ between the two files. Shown only, not choosable. Click to see them.">
+                <button className="link" onClick={() => (result.otherParts ? setTab('other') : setPanel('scope'))}>
+                  {result.otherParts ? `${otherPartsCount(result.otherParts)} difference(s) in other parts` : `${mayDiffer} not-compared part(s) may differ`}
                 </button>
               </Tip>
             )}
@@ -478,6 +482,8 @@ export function CompareView({
 
           {tab === 'formatting' ? (
             <FormattingTab result={result} onShow={(c) => showBlock(c.newId)} onBack={() => setTab('content')} />
+          ) : tab === 'other' ? (
+            <OtherPartsTab result={result} onShow={showBlock} onBack={() => setTab('content')} />
           ) : (
             <>
               <div className="toolbar">

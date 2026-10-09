@@ -2009,3 +2009,101 @@ table.from-old-row td {
     flex-wrap: wrap;
   }
 }
+
+/* ---------------------------------------------------------------- other parts and comments (decisions 45–46) */
+
+.comment-mark.comment-old {
+  background: #f3f4f6;
+  border-color: #8c959f;
+  color: #57606a;
+  font-weight: 500;
+}
+.op-sec {
+  max-width: 1000px;
+  margin-top: 18px;
+}
+.op-sec h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.op-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.op-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.op-item-head .btn {
+  margin-left: auto;
+}
+.op-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.op-col {
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--doc-font);
+  font-size: 14px;
+}
+.op-old {
+  background: var(--del-bg);
+  border-left: 3px solid var(--del);
+}
+.op-new {
+  background: var(--ins-bg);
+  border-left: 3px solid var(--ins);
+}
+.op-col-head {
+  font: 600 10px var(--ui-font);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.op-empty {
+  color: var(--muted);
+}
+.pill.op-changed {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pill.op-onlyOld {
+  background: var(--del-bg);
+  color: var(--del);
+}
+.pill.op-onlyNew {
+  background: var(--ins-bg);
+  color: var(--ins);
+}
+.pill.op-same {
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.op-comments,
+.op-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.op-comment {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.op-list li {
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--line);
+  word-break: break-word;
+}
+@media (max-width: 700px) {
+  .op-cols {
+    grid-template-columns: 1fr;
+  }
+}

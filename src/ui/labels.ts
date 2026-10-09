@@ -29,6 +29,7 @@ export const STATUS_LABEL: Record<ReviewStatus, string> = {
 
 export const SCOPE_STATUS_LABEL: Record<ScopeStatus, string> = {
   compared: 'Compared',
+  flagged: 'Compared, shown only',
   detectedOnly: 'Detected only',
   shownNotCompared: 'Shown, not compared',
   notSupported: 'Not compared',

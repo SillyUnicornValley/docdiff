@@ -42,6 +42,8 @@ export interface HyperlinkInline {
   type: 'hyperlink';
   content: TextInline[];
   urlFingerprint: string;
+  /** The address, for the Other parts tab (decision 45). Not part of the content. */
+  target?: string;
 }
 
 export type FieldType = 'DATE' | 'PAGE' | 'NUMPAGES' | 'REF' | 'PAGEREF' | 'SEQ' | 'OTHER';
@@ -95,6 +97,8 @@ export interface CommentInline {
   author: string;
   /** First words of the comment, for the tooltip. */
   preview: string;
+  /** A comment of the old file (shown since Stage 5, decision 46; never exported). */
+  fromOld?: true;
 }
 
 export type Inline =
@@ -235,6 +239,8 @@ export interface HeaderFooterRef {
   fingerprint: string;
   /** No own header here: Word's "Link to Previous" reuses the previous section's. */
   linkedToPrevious?: boolean;
+  /** Part path of the header/footer, key of DocParts.headersFooters (decision 45). */
+  part?: string;
 }
 
 /**
@@ -259,6 +265,36 @@ export interface RevisionInfo {
   unsupported: { type: string; location: string; nearBlockId?: NodeId }[];
 }
 
+/** A footnote or endnote, in the order of its first reference in the body. */
+export interface NoteItem {
+  id: string;
+  label: string;
+  blocks: Block[];
+}
+
+/** Content outside the body, compared item by item and shown only (decision 45). */
+export interface DocParts {
+  footnotes: NoteItem[];
+  endnotes: NoteItem[];
+  /** Header and footer contents by part path. */
+  headersFooters: Record<string, Block[]>;
+  /** Text box contents in body order. */
+  textBoxes: Block[][];
+  /** User-visible document properties: Title, Subject, Description, Keywords, Category. */
+  properties: Record<string, string>;
+}
+
+/** A comment, with the text it is anchored to (decision 46). */
+export interface CommentItem {
+  id: string;
+  author: string;
+  text: string;
+  /** Text inside the comment range ('' for a point comment). */
+  anchor: string;
+  /** Paragraph where the comment starts. */
+  blockId?: NodeId;
+}
+
 export interface DocModel {
   side: Side;
   fileName: string;
@@ -271,6 +307,10 @@ export interface DocModel {
   revisions: RevisionInfo;
   /** Number of comments (shown in scope panel; not compared). */
   commentCount: number;
+  /** Notes, headers, footers, text boxes, properties (decision 45). */
+  parts?: DocParts;
+  /** Comments in body order (decision 46). */
+  comments?: CommentItem[];
   /** Distinct character formats referred to by ParagraphFormat.runs (decision 44). */
   runFormats?: FormatProps[];
   /** Bookmark names in the body: a cross-reference brought back needs its bookmark (decision 43). */

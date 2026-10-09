@@ -2,7 +2,7 @@ import type { DiffResult, ScopeStatus } from '../model/diff';
 import type { StructureChange, StructureHints } from '../model/hints';
 import { SCOPE_STATUS_LABEL } from './labels';
 
-const ORDER: ScopeStatus[] = ['compared', 'detectedOnly', 'shownNotCompared', 'notSupported'];
+const ORDER: ScopeStatus[] = ['compared', 'flagged', 'detectedOnly', 'shownNotCompared', 'notSupported'];
 
 const SHOWN = 50;
 
@@ -48,9 +48,17 @@ export function ScopePanel({ result, hints, onClose }: { result: DiffResult; hin
 
         <section className="scope-sec">
           <h3>Formatting</h3>
-          <div className="scope-row">
-            <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting.
-          </div>
+          {s.formatting === 'flagged' ? (
+            <div className="scope-row">
+              <span className="pill pill-flagged">Flagged only</span> Paragraph style, alignment, indents, spacing, list type, bold/italic/underline, font, size,
+              colour, highlight and table style of content both files share: {result.formatChanges?.length ?? 0} difference(s), listed in the Formatting tab
+              and marked Aa in the text. Not choosable; the export keeps the new formatting.
+            </div>
+          ) : (
+            <div className="scope-row">
+              <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting.
+            </div>
+          )}
           <div className="scope-row">
             <span className="pill pill-flagged">Flagged only</span> Heading levels: changes are marked ⚑ in the text but cannot be chosen; the export keeps the new file's level.
           </div>
@@ -63,7 +71,7 @@ export function ScopePanel({ result, hints, onClose }: { result: DiffResult; hin
 
         {s.sectionHints.length > 0 && (
           <section className="scope-sec">
-            <h3>Headers and footers by section (detected only)</h3>
+            <h3>Headers and footers by section{result.otherParts ? ' (contents compared in Other parts)' : ' (detected only)'}</h3>
             <table className="scope-table hf-table">
               <thead>
                 <tr>
@@ -97,7 +105,7 @@ export function ScopePanel({ result, hints, onClose }: { result: DiffResult; hin
 
         {s.fingerprints.length > 0 && (
           <section className="scope-sec">
-            <h3>Other parts outside the body (detected only)</h3>
+            <h3>Other parts outside the body{result.otherParts ? ' (compared item by item in the Other parts tab)' : ' (detected only)'}</h3>
             <ul className="fp-list">
               {s.fingerprints.map((f) => (
                 <li key={f.part} className={`fp-${f.result}`}>

@@ -42,6 +42,8 @@ export interface BodyContext {
   media: Map<string, string>;
   /** Effective formatting, for the formatting check (decision 44). */
   formats?: FormatResolver;
+  /** Id prefix for content read outside the body (notes, headers…), so ids stay unique. */
+  idPrefix?: string;
 }
 
 /** What the reader collects besides blocks. */
@@ -62,6 +64,12 @@ export interface BodyResult {
   groups: Map<NodeId, string[]>;
   /** Distinct character formats (ParagraphFormat.runs index into this). */
   runFormats: FormatProps[];
+  /** Footnote and endnote ids in order of first reference (decision 45). */
+  noteRefs: { footnotes: string[]; endnotes: string[] };
+  /** Text box contents (w:txbxContent) in body order. */
+  textBoxElements: Element[];
+  /** Comment id → paragraph where it starts (decision 46). */
+  commentBlocks: Map<string, NodeId>;
 }
 
 interface FieldFrame {
@@ -172,7 +180,8 @@ export class BodyReader {
   private curFmt = -1;
   private curPStyle: string | null = null;
   private fmtIndex = new Map<string, number>();
-  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map(), runFormats: [] };
+  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map(), runFormats: [], noteRefs: { footnotes: [], endnotes: [] }, textBoxElements: [], commentBlocks: new Map() };
+  private curBlockId: NodeId | undefined;
 
   constructor(private ctx: BodyContext) {}
 
@@ -183,13 +192,20 @@ export class BodyReader {
   }
 
   private id(prefix = '') {
-    return `${this.ctx.side === 'old' ? 'o' : 'n'}${prefix}${++this.n}`;
+    return `${this.ctx.side === 'old' ? 'o' : 'n'}${this.ctx.idPrefix ?? ''}${prefix}${++this.n}`;
   }
 
   readBody(body: Element) {
     this.result.blocks = this.readBlocks(body, true);
     this.finishToc(this.result.blocks);
     return this.result;
+  }
+
+  /** Blocks of a container outside the body: a note, header, footer or text box. */
+  readContainer(el: Element): Block[] {
+    const blocks = this.readBlocks(el);
+    this.finishToc(blocks);
+    return blocks;
   }
 
   // -------------------------------------------------------------------------
@@ -280,6 +296,7 @@ export class BodyReader {
     const { role, numbering } = this.role(p);
     const block: ParagraphBlock = { kind: 'paragraph', id: this.id(), role, content: [] };
     if (numbering) block.numbering = numbering;
+    this.curBlockId = block.id;
     this.out = block.content;
     const pPr = wChild(p, 'pPr');
     this.curPStyle = wVal(pPr, 'pStyle');
@@ -319,7 +336,7 @@ export class BodyReader {
     if (f.kind === 'hyperlink') {
       const target = hyperlinkFieldTarget(f.instr);
       this.result.hyperlinkTargets.push(target);
-      this.out.push({ type: 'hyperlink', content: f.result, urlFingerprint: hashString(target) });
+      this.out.push({ type: 'hyperlink', content: f.result, urlFingerprint: hashString(target), target });
     } else this.out.push({ type: 'field', fieldType: fieldType(f.instr), instruction: f.instr.trim(), result: f.result });
   }
 
@@ -397,9 +414,10 @@ export class BodyReader {
   private comment(id: string | null) {
     if (id === null || this.commentsSeen.has(id)) return;
     this.commentsSeen.add(id);
-    if (this.ctx.side !== 'new') return;
+    if (this.curBlockId) this.result.commentBlocks.set(id, this.curBlockId);
     const c = this.ctx.comments.get(id);
-    if (c) this.emitInline({ type: 'comment', author: c.author, preview: c.preview });
+    // Old comments are shown too since Stage 5 (decision 46), marked as old; they are never exported.
+    if (c) this.emitInline(this.ctx.side === 'new' ? { type: 'comment', author: c.author, preview: c.preview } : { type: 'comment', author: c.author, preview: c.preview, fromOld: true });
   }
 
   private hyperlink(h: Element) {
@@ -420,7 +438,7 @@ export class BodyReader {
     // Placeholders or comments inside the link stay next to it.
     for (const i of content) if (i.type !== 'text') outer.push(i);
     this.result.hyperlinkTargets.push(target);
-    outer.push({ type: 'hyperlink', content: texts, urlFingerprint: hashString(target) });
+    outer.push({ type: 'hyperlink', content: texts, urlFingerprint: hashString(target), target });
   }
 
   private runMarks(r: Element): RunMarks {
@@ -502,6 +520,7 @@ export class BodyReader {
       }
       case 'footnoteReference': {
         const id = wAttr(c, 'id') ?? '';
+        if (!this.result.noteRefs.footnotes.includes(id)) this.result.noteRefs.footnotes.push(id);
         const ph = this.placeholder('footnoteRef', `Footnote ${++this.footnoteNo}`, hashString(this.ctx.footnotes.get(id) ?? ''));
         if (this.ctx.nonPortableNotes?.footnotes.has(id)) ph.notPortable = true;
         this.emitInline(ph);
@@ -509,6 +528,7 @@ export class BodyReader {
       }
       case 'endnoteReference': {
         const id = wAttr(c, 'id') ?? '';
+        if (!this.result.noteRefs.endnotes.includes(id)) this.result.noteRefs.endnotes.push(id);
         const ph = this.placeholder('endnoteRef', `Endnote ${++this.endnoteNo}`, hashString(this.ctx.endnotes.get(id) ?? ''));
         if (this.ctx.nonPortableNotes?.endnotes.has(id)) ph.notPortable = true;
         this.emitInline(ph);
@@ -542,6 +562,7 @@ export class BodyReader {
     if (txbx) {
       const text = plainText(txbx);
       this.result.textBoxTexts.push(text);
+      this.result.textBoxElements.push(txbx);
       return this.placeholder('textBox', name || 'Text box', hashString(text));
     }
     if (uri.endsWith('/picture')) {
@@ -562,6 +583,7 @@ export class BodyReader {
     if (txbx) {
       const text = plainText(txbx);
       this.result.textBoxTexts.push(text);
+      this.result.textBoxElements.push(txbx);
       return this.placeholder('textBox', 'Text box', hashString(text));
     }
     const img = p.getElementsByTagNameNS(NS.v, 'imagedata')[0];

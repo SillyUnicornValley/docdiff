@@ -23,6 +23,7 @@ import { alignBlocks, alignRows, rowKey, type AlignOp } from '../align/alignBloc
 import { diffKeys } from '../align/myers';
 import { hashString } from '../hash';
 import { compareFormatting } from './formatting';
+import { compareOtherParts } from './otherParts';
 import { blockKey, optionalDifference } from './keys';
 import { detectedOnlyRows } from './scopeRows';
 import { sectionHints } from './sections';
@@ -341,6 +342,12 @@ export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: num
   // Formatting check (decision 44): only when the reader resolved formatting for both files.
   const checked = !!o.runFormats && !!n.runFormats;
   if (checked) scope.formatting = 'flagged';
+  // Compared item by item in the Other parts tab since Stage 5 (decisions 45–46).
+  const itemByItem = new Set(['Comments', 'Footnote text', 'Endnote text', 'Hyperlink addresses', 'Document properties', 'Headers and footers', 'Text boxes']);
+  if (o.parts && n.parts) {
+    for (const i of scope.items) if (itemByItem.has(i.element)) i.status = 'flagged';
+    for (const f of scope.fingerprints) if (f.message) f.message = f.message.replace(' may differ — not compared item by item. Check in Word.', ' differ — see the Other parts tab.');
+  }
   return {
     engineVersion: ENGINE_VERSION,
     old: o,
@@ -351,5 +358,6 @@ export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: num
     sections: c.sections,
     scope,
     formatChanges: checked ? compareFormatting({ segments, differences: c.differences }, o, n) : undefined,
+    otherParts: o.parts && n.parts ? compareOtherParts({ segments, differences: c.differences, scope }, o, n) : undefined,
   };
 }

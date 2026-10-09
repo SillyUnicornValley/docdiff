@@ -125,11 +125,12 @@ describe('05 not-compared elements and comments', () => {
     expect(doc.commentCount).toBe(3);
     expect(Object.keys(doc.partFingerprints).sort()).toEqual(['footnotes', 'hyperlinkUrls', 'images', 'properties']);
   });
-  it('does not show comments of the old file', async () => {
+  it('shows comments of the old file marked as old (decision 46)', async () => {
     const { doc } = await parse('05-uncompared-and-comments_old.docx');
-    let comments = 0;
-    forEachParagraph(doc.blocks, (p) => (comments += p.content.filter((i) => i.type === 'comment').length));
-    expect(comments).toBe(0);
+    const comments: unknown[] = [];
+    forEachParagraph(doc.blocks, (p) => comments.push(...p.content.filter((i) => i.type === 'comment')));
+    expect(comments).toEqual([{ type: 'comment', author: 'Carol', preview: expect.any(String), fromOld: true }]);
+    expect(doc.comments).toMatchObject([{ author: 'Carol', anchor: '12 weeks' }]);
   });
   it('reads sections and header fingerprints', async () => {
     const [o, n] = [await parse('05-uncompared-and-comments_old.docx'), await parse('05-uncompared-and-comments_new.docx')];

@@ -88,11 +88,23 @@ function wsVisible(text: string) {
 }
 
 function PlaceholderChip({ p, mayDiffer }: { p: InlinePlaceholder; mayDiffer?: boolean }) {
+  const { result } = useView();
   const note = p.kind === 'footnoteRef' || p.kind === 'endnoteRef' ? 'text not compared' : 'not compared';
   const title =
     p.kind === 'footnoteRef' || p.kind === 'endnoteRef'
       ? 'Footnote reference: marker position is compared; footnote text is detected only.'
       : 'Shown, not compared in v1.';
+  // Since Stage 5 (decision 45) note and text box contents are compared in the Other parts tab.
+  if (result.otherParts && ['footnoteRef', 'endnoteRef', 'textBox'].includes(p.kind)) {
+    const what = p.kind === 'textBox' ? 'Text box contents are' : p.kind === 'footnoteRef' ? 'Footnote text is' : 'Endnote text is';
+    return (
+      <Tip icon={false} tip={`${what} compared in the Other parts tab (shown only, not choosable).${mayDiffer ? ' The two versions differ.' : ''}`}>
+        <span className={`ph-chip ph-${p.kind}${mayDiffer ? ' may-differ' : ''}`}>
+          [{p.label}]{mayDiffer && <span className="may-badge">differs</span>}
+        </span>
+      </Tip>
+    );
+  }
   return (
     <Tip icon={false} tip={title + (mayDiffer ? ' The two versions may differ — check in Word.' : '')}>
       <span className={`ph-chip ph-${p.kind}${mayDiffer ? ' may-differ' : ''}`}>
@@ -153,8 +165,14 @@ function WrapView({ wrap, compareFields, children }: { wrap: PieceWrap; compareF
 }
 
 function CommentMark({ c }: { c: CommentInline }) {
+  if (c.fromOld)
+    return (
+      <Tip icon={false} tip={`Comment by ${c.author} in the old file: “${c.preview}”. Shown only. Comments of the old file are not carried into the export; see Other parts › Comments.`}>
+        <span className="comment-mark comment-old">Old comment · {c.author}</span>
+      </Tip>
+    );
   return (
-    <Tip icon={false} tip={`Comment by ${c.author} in the new file: “${c.preview}”. Shown only, not compared. Comments in the new file are kept on export.`}>
+    <Tip icon={false} tip={`Comment by ${c.author} in the new file: “${c.preview}”. Shown only. Comments in the new file are kept on export; see Other parts › Comments for what changed.`}>
       <span className="comment-mark">Comment · {c.author}</span>
     </Tip>
   );

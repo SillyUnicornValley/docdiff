@@ -59,3 +59,47 @@ describe('17 old content with notes, links, fields and pictures (decision 43)', 
     expect(why).toEqual(['ok', 'ok', 'ok', 'ok', 'bookmark', 'ok', 'notesPart', 'image']);
   });
 });
+
+describe('17 other parts, item by item (decision 45)', () => {
+  it('pairs notes, headers, text boxes, link addresses and properties', async () => {
+    const p = (await run('17-notes-links-images')).otherParts!;
+    const st = (xs: { label: string; status: string }[]) => xs.map((x) => `${x.label}:${x.status}`);
+    // The edited footnote is paired with its most similar counterpart, not by position.
+    expect(st(p.footnotes)).toEqual(['Footnote 1:onlyOld', 'Footnote 2 → 1:changed', 'Footnote 3:onlyOld']);
+    expect(st(p.endnotes)).toEqual(['Endnote 1:onlyOld']);
+    expect(st(p.headersFooters)).toEqual(['Section 1 · Header:changed']);
+    expect(st(p.textBoxes)).toEqual(['Text box 1:changed']);
+    expect(p.links.map((l) => [l.text, l.old, l.new])).toEqual([['FAQ', 'https://example.com/faq-2025', 'https://example.com/faq-2026']]);
+    expect(p.properties).toContainEqual({ name: 'Subject', old: 'Pharmacy manual', new: 'Pharmacy manual (revised)' });
+    const fn = p.footnotes[1];
+    expect(fn.hunks.length).toBeGreaterThan(0);
+  });
+
+  it('05: a changed picture in a shared paragraph is listed', async () => {
+    const r = await compareFiles(
+      { name: 'o', data: testdoc('05-uncompared-and-comments_old.docx') },
+      { name: 'n', data: testdoc('05-uncompared-and-comments_new.docx') },
+    );
+    expect(r.result.otherParts!.images).toHaveLength(1);
+    expect(r.result.scope.items.find((i) => i.element === 'Footnote text')?.status).toBe('flagged');
+  });
+});
+
+describe('18 comments (decision 46)', () => {
+  it('pairs comments by author and text, then by anchor', async () => {
+    const r = await run('18-comments');
+    const c = r.otherParts!.comments.map((x) => `${x.status}:${(x.new ?? x.old)!.author}:${(x.new ?? x.old)!.anchor}`);
+    expect(c).toEqual([
+      'same:Dana:18 years or older',
+      'textChanged:Dana:30 days',
+      'anchorChanged:Evan:at least 50 kg',
+      'onlyNew:Farah:Participants with a history of seizures are excluded.',
+      'onlyOld:Evan:Participants must be able to swallow tablets.',
+    ]);
+    // Old comments are shown, marked as old; they never create a difference.
+    expect(describeResult(r).filter((l) => !l.startsWith('='))).toEqual([
+      '~ Body weight of at least 45 kg is required. ⟶ Body weight of at least 50 kg is required.',
+      '+ Participants with a history of seizures are excluded.',
+    ]);
+  });
+});

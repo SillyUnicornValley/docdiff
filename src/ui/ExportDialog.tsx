@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ExportResult } from '../engine';
 import type { DiffResult } from '../model/diff';
 import type { Review } from '../model/reviewOps';
 import { downloadBlob, Modal, yyyymmdd } from './kit';
+import { hasNewComment } from './render';
+import { makeIndexes } from './rows';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -26,6 +28,11 @@ export function ExportDialog({
   const unreviewed = reviewable.filter((id) => !review.state.choices[id]).length;
   const usedOld = reviewable.filter((id) => review.state.choices[id] === 'old').length;
   const mixed = reviewable.filter((id) => typeof review.state.choices[id] === 'object').length;
+  // New-file comments on content set to old: the comment may end up on other text (decision 46).
+  const commented = useMemo(() => {
+    const ix = makeIndexes(result);
+    return reviewable.filter((id) => review.state.choices[id] !== undefined && review.state.choices[id] !== 'new' && hasNewComment(result.differences[id], ix)).length;
+  }, [result, reviewable, review.state.choices]);
   const pending = result.scope.pendingRevisionsInNew;
   const fileName = `${result.new.fileName.replace(/\.docx$/i, '')}_merged_${yyyymmdd()}.docx`;
   const [mode, setMode] = useState<'clean' | 'tracked'>('clean');
@@ -115,6 +122,11 @@ export function ExportDialog({
                 )}
                 ; everything else comes from the new file.
               </li>
+              {commented > 0 && (
+                <li className="warn">
+                  ⚠ <b>{commented}</b> difference(s) set to Use old contain a comment of the new file. The comment is kept, but it may now sit on other text — check it in Word.
+                </li>
+              )}
               {pending > 0 && (
                 <li className="warn">
                   ⚠ The new file contains <b>{pending}</b> pending tracked change(s). They will be <b>accepted</b> in the exported file.
