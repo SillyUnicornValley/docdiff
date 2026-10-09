@@ -167,7 +167,10 @@ export class NumberingState {
     // Lower levels restart after a higher level advances.
     c.length = ilvl + 1;
 
-    if (lvl.numFmt === 'bullet') return { listId: abs, level: ilvl, format: 'bullet', label: bulletChar(lvl.lvlText, ilvl) };
+    if (lvl.numFmt === 'bullet') {
+      const ch = bulletChar(lvl.lvlText, ilvl);
+      return { listId: abs, level: ilvl, format: 'bullet', label: ch, listStyle: `Bullet ${ch}` };
+    }
     const label = lvl.lvlText.replace(/%([1-9])/g, (_, d: string) => {
       const l = Number(d) - 1;
       const lv = this.level(numId, abs, l);
@@ -175,6 +178,11 @@ export class NumberingState {
       return format(n, lvl.isLgl && l < ilvl ? 'decimal' : (lv?.numFmt ?? 'decimal'));
     });
     if (lvl.numFmt === 'none' && !label.trim()) return undefined;
-    return { listId: abs, level: ilvl, format: 'number', label };
+    // The list's look, independent of the position: every level shown as its first number.
+    const pattern = lvl.lvlText.replace(/%([1-9])/g, (_, d: string) => {
+      const l = Number(d) - 1;
+      return format(1, lvl.isLgl && l < ilvl ? 'decimal' : (this.level(numId, abs, l)?.numFmt ?? 'decimal'));
+    });
+    return { listId: abs, level: ilvl, format: 'number', label, listStyle: `Numbered ${pattern}` };
   }
 }

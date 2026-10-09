@@ -37,7 +37,7 @@ function resolvePath(sourcePart: string, target: string): string {
   return parts.join('/');
 }
 
-function relsPathOf(part: string): string {
+export function relsPathOf(part: string): string {
   const i = part.lastIndexOf('/');
   return `${part.slice(0, i + 1)}_rels/${part.slice(i + 1)}.rels`;
 }

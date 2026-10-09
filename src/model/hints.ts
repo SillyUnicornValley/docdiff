@@ -5,7 +5,7 @@
 
 import type { DiffResult, RowSegment, Segment } from './diff';
 import { DocIndex } from './docIndex';
-import type { Block, NodeId, ParagraphBlock, ParagraphRole } from './document';
+import type { Block, NodeId, ParagraphBlock, ParagraphRole, TableBlock } from './document';
 import { flattenParagraph } from './flatten';
 
 export interface StructureChange {
@@ -34,14 +34,26 @@ const isHeading = (r: ParagraphRole) => r.type === 'heading' || r.type === 'titl
 /** Label shown when one side has no automatic number. */
 export const NO_NUMBER = 'no number';
 
+export interface PairedNodes {
+  paragraphs: [ParagraphBlock, ParagraphBlock][];
+  tables: [TableBlock, TableBlock][];
+}
+
 /**
  * Paired paragraphs, in document order of the alignment: equal content,
  * modified paragraphs (1:1 by position) and moves, including inside tables.
  */
-function pairedParagraphs(r: DiffResult, ix: { old: DocIndex; new: DocIndex }): [ParagraphBlock, ParagraphBlock][] {
+function pairedParagraphs(r: Pick<DiffResult, 'segments' | 'differences'>, ix: { old: DocIndex; new: DocIndex }): [ParagraphBlock, ParagraphBlock][] {
+  return pairedNodes(r, ix).paragraphs;
+}
+
+/** Paired paragraphs (see above) and paired tables: equal, compared row by row, or a whole-table difference. */
+export function pairedNodes(r: Pick<DiffResult, 'segments' | 'differences'>, ix: { old: DocIndex; new: DocIndex }): PairedNodes {
   const out: [ParagraphBlock, ParagraphBlock][] = [];
+  const tables: [TableBlock, TableBlock][] = [];
   const pair = (o: Block, n: Block) => {
     if (o.kind === 'table' && n.kind === 'table') {
+      tables.push([o, n]);
       // Equal tables: pair cell contents by position.
       o.rows.forEach((row, ri) => row.cells.forEach((c, ci) => pairLists(c.blocks, n.rows[ri]?.cells[ci]?.blocks ?? [])));
     } else if (o.kind === 'paragraph' && n.kind === 'paragraph') out.push([o, n]);
@@ -58,7 +70,11 @@ function pairedParagraphs(r: DiffResult, ix: { old: DocIndex; new: DocIndex }): 
         if (seen.has(d.id) || d.old.unit !== 'block') continue;
         seen.add(d.id);
         if ((d.kind === 'modified' || d.kind === 'moved') && d.old.ids.length === d.new.ids.length) pairIds(d.old.ids, d.new.ids);
-      } else s.rows.forEach(walkRow);
+        else if (d.kind === 'tableStructure') tables.push([ix.old.table(d.old.ids[0]), ix.new.table(d.new.ids[0])]);
+      } else {
+        tables.push([ix.old.table(s.oldTableId), ix.new.table(s.newTableId)]);
+        s.rows.forEach(walkRow);
+      }
     }
   };
   const walkRow = (row: RowSegment) => {
@@ -68,7 +84,7 @@ function pairedParagraphs(r: DiffResult, ix: { old: DocIndex; new: DocIndex }): 
     } else if (row.type === 'rowPair') row.cells.forEach((c) => walk(c.segments));
   };
   walk(r.segments);
-  return out;
+  return { paragraphs: out, tables };
 }
 
 export function structureHints(r: DiffResult, ix = { old: new DocIndex(r.old), new: new DocIndex(r.new) }): StructureHints {

@@ -19,7 +19,7 @@ import { exportClean } from './exportDocx';
 
 const PAIRS = ['01-basic-text', '02-lists', '03-tables', '04-tracked-changes', '05-uncompared-and-comments', '06-edge-alignment', '07-long-document',
   '08-export-formatting', '09-sections-headers', '10-complex-tables', '11-fields-and-controls', '12-tracked-and-comments', '13-reorder-and-repeats',
-  '14-unicode-and-normalisation', '15-realistic-sop'];
+  '14-unicode-and-normalisation', '15-realistic-sop', '16-formatting', '17-notes-links-images', '18-comments'];
 const REAL = ['real examples/77242113PSO3001_Data Management Plan_v1.01_13MAR2025.docx', 'real examples/77242113PSO3001_Data Management Plan_V3.02_16Jun2026.docx'];
 
 const files = (pair: string) => ({
@@ -242,3 +242,37 @@ function describeIds(r: DiffResult, id: string): string {
   const text = (side: 'old' | 'new') => d[side].ids.map((x) => JSON.stringify(r[side].blocks.find((b) => b.id === x) ?? '')).join(' ');
   return `${text('old')} ${text('new')}`;
 }
+
+describe('clean export of 17 (old content with notes, links, pictures, equations; decision 43)', () => {
+  it('copies footnotes, links, pictures and equations into the new file', async () => {
+    const f = files('17-notes-links-images');
+    const { result } = await compareFiles(f.old, f.new);
+    const choices = Object.fromEntries(result.order.filter((id) => result.differences[id].useOld.available).map((id) => [id, 'old' as Choice]));
+    const out = await exportClean(f.old, f.new, result, choices);
+    expect(out.check).toMatchObject({ ok: true });
+    const again = await parseDocx(out.bytes.buffer as ArrayBuffer, 'new', 'x');
+    const zip = again.pkg.zip;
+    const read = async (p: string) => (await zip.file(p)?.async('string')) ?? '';
+    const footnotes = await read('word/footnotes.xml');
+    // The old footnotes are back, each once, under new ids; the new file's own footnote stays.
+    for (const t of ['Use a 0.2 micron in-line filter.', 'Infusion pumps must be calibrated yearly.', 'See the stability data at', 'calibrated every six months.'])
+      expect(footnotes.split(t).length - 1).toBe(1);
+    const ids = [...footnotes.matchAll(/<w:footnote [^>]*w:id="(-?\d+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The link inside the copied footnote has a relationship of the footnotes part.
+    expect(await read('word/_rels/footnotes.xml.rels')).toContain('https://example.com/cx201/stability');
+    const rels = await read('word/_rels/document.xml.rels');
+    expect(rels).toContain('https://example.com/cx201/handling');
+    // The picture is copied and its type is known.
+    const media = Object.keys(zip.files).filter((p) => p.startsWith('word/media/docdiff'));
+    expect(media).toHaveLength(1);
+    expect(rels).toContain(media[0].replace('word/', ''));
+    const doc = new XMLSerializer().serializeToString(again.xml);
+    expect(doc).toContain('<m:t>Dose = BSA × 75</m:t>');
+    const docPr = [...doc.matchAll(/<wp:docPr [^>]*id="(\d+)"/g)].map((m) => m[1]);
+    expect(new Set(docPr).size).toBe(docPr.length);
+    // Blocked: the cross-reference to a bookmark the new file lacks, the endnote, the linked picture.
+    expect(doc).not.toContain('REF _RefReturns');
+    expect(again.doc.notesParts?.endnotes).toBe(false);
+  });
+});

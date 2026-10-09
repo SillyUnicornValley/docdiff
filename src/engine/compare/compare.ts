@@ -18,10 +18,11 @@ import type {
 import { forEachParagraph } from '../../model/docIndex';
 import { flattenParagraph } from '../../model/flatten';
 import { computeScope } from '../../model/scope';
-import { computeUseOld, useOldBlocked } from '../../model/useOld';
+import { portableUseOld, useOldBlocked, type UseOldContext } from '../../model/useOld';
 import { alignBlocks, alignRows, rowKey, type AlignOp } from '../align/alignBlocks';
 import { diffKeys } from '../align/myers';
 import { hashString } from '../hash';
+import { compareFormatting } from './formatting';
 import { blockKey, optionalDifference } from './keys';
 import { detectedOnlyRows } from './scopeRows';
 import { sectionHints } from './sections';
@@ -50,6 +51,8 @@ class Comparer {
   private currentSection = 'start';
   private idCount = new Map<string, number>();
 
+  constructor(private useOldCtx: UseOldContext) {}
+
   private noteSection(b: Block, top: boolean) {
     if (!top || !isH1(b)) return;
     this.currentSection = b.id;
@@ -63,14 +66,14 @@ class Comparer {
     this.idCount.set(base, k);
     const id = k === 1 ? base : `${base}-${k}`;
     const unit = [...oldUnits, ...newUnits].some((u) => !('kind' in u)) ? 'row' : 'block';
-    const blocks = [...oldUnits, ...newUnits].flatMap((u) => ('kind' in u ? [u] : cellBlocks([u])));
+    const oldBlocks = oldUnits.flatMap((u) => ('kind' in u ? [u] : cellBlocks([u])));
     const d: Difference = {
       id,
       kind,
       old: { unit, ids: oldUnits.map((u) => u.id) },
       new: { unit, ids: newUnits.map((u) => u.id) },
       wordHunks: [],
-      useOld: computeUseOld(blocks),
+      useOld: portableUseOld(oldBlocks, this.useOldCtx),
       sectionId: this.currentSection,
       ...extra,
     };
@@ -331,9 +334,13 @@ function applyBoundaries(differences: Record<string, Difference>, groups: Groups
 }
 
 export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: number, groups?: Groups): DiffResult {
-  const c = new Comparer();
+  const c = new Comparer({ newBookmarks: new Set(n.bookmarks ?? []), newNotes: n.notesParts ?? { footnotes: false, endnotes: false } });
   const segments = c.container(o.blocks, n.blocks, true);
   if (groups) applyBoundaries(c.differences, groups);
+  const scope = computeScope(o, n, { extraScope: detectedOnlyRows(o, n), pendingRevisionsInNew, sectionHints: sectionHints(o, n, segments, c.differences) });
+  // Formatting check (decision 44): only when the reader resolved formatting for both files.
+  const checked = !!o.runFormats && !!n.runFormats;
+  if (checked) scope.formatting = 'flagged';
   return {
     engineVersion: ENGINE_VERSION,
     old: o,
@@ -342,6 +349,7 @@ export function compareDocs(o: DocModel, n: DocModel, pendingRevisionsInNew: num
     differences: c.differences,
     order: orderOf(segments),
     sections: c.sections,
-    scope: computeScope(o, n, { extraScope: detectedOnlyRows(o, n), pendingRevisionsInNew, sectionHints: sectionHints(o, n, segments, c.differences) }),
+    scope,
+    formatChanges: checked ? compareFormatting({ segments, differences: c.differences }, o, n) : undefined,
   };
 }

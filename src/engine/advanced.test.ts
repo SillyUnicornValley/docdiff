@@ -67,7 +67,8 @@ describe('11 fields and content controls', () => {
     expect(lines).toContain('~ ☐ Not applicable (no biological samples are stored) ⟶ ☒ Not applicable (no biological samples are stored)');
     expect(lines).toContain('~ Phase: Phase 2 ⟶ Phase: Phase 3');
     expect(lines).toContain('~ The study runs in Boston and Denver. ⟶ The study runs in Chicago and Denver.');
-    expect(blocked(r)).toEqual(['contentControlBoundary', 'field', 'field', 'field', 'field', 'hyperlink', 'footnote', 'footnote', 'field']);
+    // Since Stage 5 (decision 43) fields, hyperlinks and footnotes can come back; only the broken structure still blocks.
+    expect(blocked(r)).toEqual(['contentControlBoundary']);
     expect(diffs(r).filter((d) => d.informational === 'fields')).toHaveLength(3); // SEQ captions, field across paragraphs
     expect(r.scope.fingerprints.filter((f) => f.result === 'mayDiffer').map((f) => f.part)).toEqual(
       expect.arrayContaining(['footnotes', 'endnotes', 'hyperlinkUrls', 'textBoxes']),

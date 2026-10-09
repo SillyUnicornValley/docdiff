@@ -322,6 +322,8 @@ class Doc:
         self.num_extra_abstract = num_extra_abstract
         self.num_extra_num = num_extra_num
         self.even_odd = even_odd
+        self.fn_rels = []  # relationships of the footnotes part (links inside footnotes)
+        self.core_extra = ""  # more document properties (dc:subject…)
 
     def add_hf(self, kind, content):
         """A header or footer part. content: text or paragraph xml. Returns its relationship id."""
@@ -409,6 +411,11 @@ class Doc:
                 '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>'
                 + "".join(self.footnotes) + "</w:footnotes>")
             fn_pr = '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>'
+            if self.fn_rels:
+                files["word/_rels/footnotes.xml.rels"] = (
+                    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    + "".join(self.fn_rels) + "</Relationships>")
         en_pr = ""
         if self.endnotes:
             rels.append(f'<Relationship Id="rIdEndnotes" Type="{REL}/endnotes" Target="endnotes.xml"/>')
@@ -453,7 +460,7 @@ class Doc:
             '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
             'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
             'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-            f'<dc:title>{escape(os.path.basename(path))}</dc:title><dc:creator>docdiff test generator</dc:creator>'
+            f'<dc:title>{escape(os.path.basename(path))}</dc:title>{self.core_extra}<dc:creator>docdiff test generator</dc:creator>'
             f'<dcterms:created xsi:type="dcterms:W3CDTF">{DATE}</dcterms:created></cp:coreProperties>')
         ct = ['<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
               '<Default Extension="xml" ContentType="application/xml"/>',
@@ -935,8 +942,9 @@ def main():
     only = [a.split("=", 1)[1].split(",") for a in sys.argv[1:] if a.startswith("--only=")]
     out_dir = args[0] if args else os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs")
     os.makedirs(out_dir, exist_ok=True)
-    from build_testdocs_advanced import ADVANCED_CASES  # 08 and later (more complex documents)
-    for name, fn in CASES + ADVANCED_CASES:
+    from build_testdocs_advanced import ADVANCED_CASES  # 08–15 (more complex documents)
+    from build_testdocs_stage5 import STAGE5_CASES  # 16 and later (Stage 5: formatting, notes, comments)
+    for name, fn in CASES + ADVANCED_CASES + STAGE5_CASES:
         if only and not any(name.startswith(o) for o in only[0]):
             continue
         result = fn()

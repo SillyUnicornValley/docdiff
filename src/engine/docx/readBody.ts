@@ -4,6 +4,7 @@
 import type {
   Block,
   FieldType,
+  FormatProps,
   Inline,
   InlinePlaceholder,
   InlinePlaceholderKind,
@@ -21,6 +22,7 @@ import type {
 import { hashString } from '../hash';
 import type { Relationship } from './package';
 import type { NumberingState } from './numbering';
+import type { FormatResolver } from './formatting';
 import type { StyleMap } from './styles';
 import { elementChildren, isW, NS, onOff, plainText, wAttr, wChild, wChildren, wVal } from './xml';
 
@@ -32,10 +34,14 @@ export interface BodyContext {
   /** Footnote / endnote text by id, for placeholder fingerprints. */
   footnotes: Map<string, string>;
   endnotes: Map<string, string>;
+  /** Notes that cannot be copied into another file (decision 43). */
+  nonPortableNotes?: { footnotes: Set<string>; endnotes: Set<string> };
   /** Comments of this file by id. Only the new file's comments are shown (decision 19). */
   comments: Map<string, { author: string; preview: string }>;
   /** Media fingerprints by part path. */
   media: Map<string, string>;
+  /** Effective formatting, for the formatting check (decision 44). */
+  formats?: FormatResolver;
 }
 
 /** What the reader collects besides blocks. */
@@ -54,6 +60,8 @@ export interface BodyResult {
    * "Use old" (spec/export §2).
    */
   groups: Map<NodeId, string[]>;
+  /** Distinct character formats (ParagraphFormat.runs index into this). */
+  runFormats: FormatProps[];
 }
 
 interface FieldFrame {
@@ -101,12 +109,53 @@ const cleanMarks = (m: RunMarks): RunMarks | undefined => {
   return Object.keys(out).length ? out : undefined;
 };
 
+/**
+ * Character format of each piece of a text inline, as [length, format index]
+ * pairs. Kept beside the inline, not in it: formatting must not split text
+ * (a word half in bold is still one word for the comparison, acceptance 1).
+ */
+const formatChunks = new WeakMap<TextInline, number[]>();
+
 /** Append text, merging with the previous text inline when the marks match (split runs become one). */
-function pushText(target: Inline[] | TextInline[], text: string, marks?: RunMarks) {
+function pushText(target: Inline[] | TextInline[], text: string, marks?: RunMarks, fmt = -1) {
   if (!text) return;
   const last = target.at(-1);
-  if (last?.type === 'text' && sameMarks(last.marks, marks)) last.text += text;
-  else (target as Inline[]).push(marks ? { type: 'text', text, marks } : { type: 'text', text });
+  let t: TextInline;
+  if (last?.type === 'text' && sameMarks(last.marks, marks)) {
+    last.text += text;
+    t = last;
+  } else {
+    t = marks ? { type: 'text', text, marks } : { type: 'text', text };
+    (target as Inline[]).push(t);
+  }
+  const c = formatChunks.get(t);
+  if (c) c.push(text.length, fmt);
+  else formatChunks.set(t, [text.length, fmt]);
+}
+
+/** Character format ranges of a paragraph over its flattened text (same walk as flattenInlines). */
+function formatRuns(content: Inline[]): [number, number, number][] {
+  const runs: [number, number, number][] = [];
+  let pos = 0;
+  const text = (t: TextInline) => {
+    const c = formatChunks.get(t) ?? [t.text.length, -1];
+    for (let i = 0; i < c.length; i += 2) {
+      const [len, f] = [c[i], c[i + 1]];
+      const last = runs.at(-1);
+      if (f >= 0) {
+        if (last && last[1] === pos && last[2] === f) last[1] = pos + len;
+        else runs.push([pos, pos + len, f]);
+      }
+      pos += len;
+    }
+  };
+  for (const i of content) {
+    if (i.type === 'text') text(i);
+    else if (i.type === 'hyperlink') i.content.forEach(text);
+    else if (i.type === 'field') i.result.forEach(text);
+    else if (i.type !== 'comment') pos += 1;
+  }
+  return runs;
 }
 
 export class BodyReader {
@@ -119,7 +168,11 @@ export class BodyReader {
   private commentsSeen = new Set<string>();
   private out: Inline[] = [];
   private groupNo = 0;
-  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map() };
+  /** Format index of the run being read, and the style of its paragraph (decision 44). */
+  private curFmt = -1;
+  private curPStyle: string | null = null;
+  private fmtIndex = new Map<string, number>();
+  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map(), runFormats: [] };
 
   constructor(private ctx: BodyContext) {}
 
@@ -228,6 +281,8 @@ export class BodyReader {
     const block: ParagraphBlock = { kind: 'paragraph', id: this.id(), role, content: [] };
     if (numbering) block.numbering = numbering;
     this.out = block.content;
+    const pPr = wChild(p, 'pPr');
+    this.curPStyle = wVal(pPr, 'pStyle');
     const spanning = () => (this.fields[0] && this.fields[0].kind !== 'toc' && fieldKeyword(this.fields[0].instr) !== 'TOC' ? this.fields[0].group : undefined);
     const atStart = spanning();
     this.inlines(p, {});
@@ -239,6 +294,7 @@ export class BodyReader {
       this.emitField(outer);
       outer.result = [];
     }
+    if (this.ctx.formats) block.format = { para: this.ctx.formats.paragraph(pPr), runs: formatRuns(block.content) };
     return block;
   }
 
@@ -250,8 +306,8 @@ export class BodyReader {
   private emitText(text: string, marks?: RunMarks) {
     if (this.fields.some((f) => f.phase === 'instr')) return;
     const outer = this.fields[0];
-    if (outer && outer.kind !== 'toc') pushText(outer.result, text, marks);
-    else pushText(this.out, text, marks);
+    if (outer && outer.kind !== 'toc') pushText(outer.result, text, marks, this.curFmt);
+    else pushText(this.out, text, marks, this.curFmt);
   }
 
   private emitInline(inl: Inline) {
@@ -381,9 +437,22 @@ export class BodyReader {
     return cleanMarks(m) ?? {};
   }
 
+  private runFormat(r: Element): number {
+    if (!this.ctx.formats) return -1;
+    const props = this.ctx.formats.run(wChild(r, 'rPr'), this.curPStyle);
+    const key = JSON.stringify(props);
+    let k = this.fmtIndex.get(key);
+    if (k === undefined) {
+      k = this.result.runFormats.push(props) - 1;
+      this.fmtIndex.set(key, k);
+    }
+    return k;
+  }
+
   private run(r: Element) {
     const marks = this.runMarks(r);
     const mk = Object.keys(marks).length ? marks : undefined;
+    this.curFmt = this.runFormat(r);
     for (const c of elementChildren(r)) {
       if (c.namespaceURI === NS.mc && c.localName === 'AlternateContent') {
         const choice = c.getElementsByTagNameNS(NS.mc, 'Choice')[0];
@@ -433,12 +502,16 @@ export class BodyReader {
       }
       case 'footnoteReference': {
         const id = wAttr(c, 'id') ?? '';
-        this.emitInline(this.placeholder('footnoteRef', `Footnote ${++this.footnoteNo}`, hashString(this.ctx.footnotes.get(id) ?? '')));
+        const ph = this.placeholder('footnoteRef', `Footnote ${++this.footnoteNo}`, hashString(this.ctx.footnotes.get(id) ?? ''));
+        if (this.ctx.nonPortableNotes?.footnotes.has(id)) ph.notPortable = true;
+        this.emitInline(ph);
         break;
       }
       case 'endnoteReference': {
         const id = wAttr(c, 'id') ?? '';
-        this.emitInline(this.placeholder('endnoteRef', `Endnote ${++this.endnoteNo}`, hashString(this.ctx.endnotes.get(id) ?? '')));
+        const ph = this.placeholder('endnoteRef', `Endnote ${++this.endnoteNo}`, hashString(this.ctx.endnotes.get(id) ?? ''));
+        if (this.ctx.nonPortableNotes?.endnotes.has(id)) ph.notPortable = true;
+        this.emitInline(ph);
         break;
       }
       case 'commentReference':
@@ -472,9 +545,13 @@ export class BodyReader {
       return this.placeholder('textBox', name || 'Text box', hashString(text));
     }
     if (uri.endsWith('/picture')) {
-      const embed = d.getElementsByTagNameNS(NS.a, 'blip')[0]?.getAttributeNS(NS.r, 'embed');
+      const blip = d.getElementsByTagNameNS(NS.a, 'blip')[0];
+      const embed = blip?.getAttributeNS(NS.r, 'embed');
       const target = embed ? this.ctx.rels.get(embed)?.target : undefined;
-      return this.placeholder('image', name || 'Picture', target ? this.ctx.media.get(target) : undefined);
+      const ph = this.placeholder('image', name || 'Picture', target ? this.ctx.media.get(target) : undefined);
+      // A linked picture lives outside the file: it cannot be brought back (decision 43).
+      if (!embed || blip?.hasAttributeNS(NS.r, 'link')) ph.notPortable = true;
+      return ph;
     }
     if (uri.endsWith('/chart')) return this.placeholder('chart', name || 'Chart', hashString(name));
     return this.placeholder('shape', name || 'Shape', hashString(name + uri));
@@ -490,8 +567,10 @@ export class BodyReader {
     const img = p.getElementsByTagNameNS(NS.v, 'imagedata')[0];
     const rid = img?.getAttributeNS(NS.r, 'id');
     if (rid) {
-      const target = this.ctx.rels.get(rid)?.target;
-      return this.placeholder('image', 'Picture', target ? this.ctx.media.get(target) : undefined);
+      const rel = this.ctx.rels.get(rid);
+      const ph = this.placeholder('image', 'Picture', rel ? this.ctx.media.get(rel.target) : undefined);
+      if (!rel || rel.external) ph.notPortable = true;
+      return ph;
     }
     return this.placeholder('shape', 'Shape');
   }
@@ -503,6 +582,7 @@ export class BodyReader {
   private table(tbl: Element): TableBlock {
     const widths = wChildren(wChild(tbl, 'tblGrid') ?? tbl, 'gridCol').map((g) => Number(wAttr(g, 'w') ?? 0));
     const t: TableBlock = { kind: 'table', id: this.id('t'), gridColumns: widths.length, rows: [] };
+    if (this.ctx.formats) t.style = this.ctx.formats.table(wChild(tbl, 'tblPr'));
     if (widths.length && widths.every((w) => w > 0)) t.columnWidths = widths;
     this.result.source.set(t.id, tbl);
     const rows = (el: Element): Element[] =>

@@ -18,6 +18,9 @@ import { insertAfter, setRPr, wEl, XML_NS } from './dom';
 
 export class ExportError extends Error {}
 
+/** Markers kept when a paragraph's content is replaced. */
+const MARKERS = new Set(['bookmarkStart', 'bookmarkEnd', 'commentRangeStart', 'commentRangeEnd', 'permStart', 'permEnd']);
+
 interface Char {
   ch: string;
   marks?: RunMarks;
@@ -152,6 +155,49 @@ export class ParagraphEditor {
     }
     flush(undefined);
     this.merge(created);
+  }
+
+  /**
+   * Replace the whole content of `p` (new file) by the content of `src`, an old
+   * paragraph already imported into the new document (decision 43, for
+   * paragraphs with footnotes, links, fields, pictures or equations). The new
+   * paragraph keeps its properties. Its bookmark and comment markers stay:
+   * those before any visible content at the start, the others at the end.
+   */
+  replaceContent(p: Element, src: Element) {
+    const doc = p.ownerDocument;
+    const pPr = wChild(p, 'pPr');
+    const lead: Element[] = [];
+    const trail: Element[] = [];
+    let seenContent = false;
+    const visit = (el: Element) => {
+      for (const c of elementChildren(el)) {
+        if (c === pPr) continue;
+        if (isW(c) && MARKERS.has(c.localName)) {
+          (seenContent ? trail : lead).push(c);
+          continue;
+        }
+        if (isW(c, 'r')) {
+          const ref = wChild(c, 'commentReference');
+          if (ref) {
+            const r = wEl(doc, 'r');
+            const rPr = wChild(c, 'rPr');
+            if (rPr) r.appendChild(rPr.cloneNode(true));
+            r.appendChild(ref.cloneNode(true));
+            (seenContent ? trail : lead).push(r);
+          }
+          if (elementChildren(c).some((k) => childChars(k) !== null || isW(k, 'drawing') || isW(k, 'footnoteReference') || isW(k, 'endnoteReference'))) seenContent = true;
+          continue;
+        }
+        if (isW(c)) visit(c);
+        else seenContent = true; // equations and other inline content
+      }
+    };
+    visit(p);
+    for (const c of elementChildren(p)) if (c !== pPr) p.removeChild(c);
+    for (const m of lead) p.appendChild(m);
+    for (const c of elementChildren(src)) if (!isW(c, 'pPr')) p.appendChild(c);
+    for (const m of trail) p.appendChild(m);
   }
 
   /**

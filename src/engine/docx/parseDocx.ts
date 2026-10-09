@@ -5,8 +5,9 @@ import type { DocModel, DocSection, FingerprintedPart, HeaderFooterRef, HeaderVa
 import { hashBytes, hashString, sha256Hex } from '../hash';
 import { acceptAllRevisions, revisionTotal } from './acceptRevisions';
 import { NumberingState } from './numbering';
-import { openDocx, type DocxPackage } from './package';
+import { openDocx, parseRels, relsPathOf, type DocxPackage, type Relationship } from './package';
 import { BodyReader } from './readBody';
+import { FormatResolver } from './formatting';
 import { StyleMap } from './styles';
 import { DocxError, NS, plainText, wAttr, wChild, wChildren } from './xml';
 
@@ -25,17 +26,38 @@ export interface ParsedDocx {
 
 const VARIANTS: HeaderVariant[] = ['default', 'first', 'even'];
 
+/**
+ * Can a note be copied into another file (decision 43)? Not when it holds a
+ * text box or embedded object, or refers to a part other than a picture or a link.
+ */
+function portableNote(n: Element, rels: Map<string, Relationship>): boolean {
+  if (n.getElementsByTagNameNS(NS.w, 'txbxContent').length || n.getElementsByTagNameNS(NS.w, 'object').length) return false;
+  for (const el of Array.from(n.getElementsByTagName('*'))) {
+    for (const a of Array.from(el.attributes)) {
+      if (a.namespaceURI !== NS.r) continue;
+      const rel = rels.get(a.value);
+      if (!rel || (!rel.external && !rel.type.endsWith('/image') && !rel.type.endsWith('/hyperlink'))) return false;
+    }
+  }
+  return true;
+}
+
 async function notesText(pkg: DocxPackage, relSuffix: string, local: 'footnote' | 'endnote') {
   const map = new Map<string, string>();
+  const nonPortable = new Set<string>();
   const path = pkg.partByType(relSuffix);
   const doc = path ? await pkg.readXml(path) : null;
-  if (!doc) return map;
+  if (!doc || !path) return { map, nonPortable, present: false };
+  const relsDoc = await pkg.readXml(relsPathOf(path));
+  const rels = relsDoc ? parseRels(relsDoc, path) : new Map<string, Relationship>();
   for (const n of wChildren(doc.documentElement, local)) {
     const type = wAttr(n, 'type');
     if (type && type !== 'normal') continue; // separators
-    map.set(wAttr(n, 'id') ?? '', plainText(n));
+    const id = wAttr(n, 'id') ?? '';
+    map.set(id, plainText(n));
+    if (!portableNote(n, rels)) nonPortable.add(id);
   }
-  return map;
+  return { map, nonPortable, present: true };
 }
 
 async function commentsOf(pkg: DocxPackage) {
@@ -128,15 +150,18 @@ export async function parseDocx(data: ArrayBuffer, side: Side, fileName: string)
 
   const stylesPath = pkg.partByType('/styles');
   const numberingPath = pkg.partByType('/numbering');
-  const styles = new StyleMap(stylesPath ? await pkg.readXml(stylesPath) : null);
+  const stylesXml = stylesPath ? await pkg.readXml(stylesPath) : null;
+  const styles = new StyleMap(stylesXml);
   const numbering = new NumberingState(numberingPath ? await pkg.readXml(numberingPath) : null, styles);
-  const footnotes = await notesText(pkg, '/footnotes', 'footnote');
-  const endnotes = await notesText(pkg, '/endnotes', 'endnote');
+  const fn = await notesText(pkg, '/footnotes', 'footnote');
+  const en = await notesText(pkg, '/endnotes', 'endnote');
+  const footnotes = fn.map;
+  const endnotes = en.map;
   const comments = await commentsOf(pkg);
   const media = await mediaFingerprints(pkg);
   const hf = await headerFooterFingerprints(pkg);
 
-  const reader = new BodyReader({ side, styles, numbering, rels: pkg.rels, footnotes, endnotes, comments, media });
+  const reader = new BodyReader({ side, styles, numbering, rels: pkg.rels, footnotes, endnotes, nonPortableNotes: { footnotes: fn.nonPortable, endnotes: en.nonPortable }, comments, media, formats: new FormatResolver(stylesXml) });
   const r = reader.readBody(body);
 
   const parts: Partial<Record<FingerprintedPart, string>> = {};
@@ -162,6 +187,9 @@ export async function parseDocx(data: ArrayBuffer, side: Side, fileName: string)
       unsupported: revisions.unsupported,
     },
     commentCount: comments.size,
+    runFormats: r.runFormats,
+    bookmarks: [...new Set(Array.from(body.getElementsByTagNameNS(NS.w, 'bookmarkStart')).map((b) => wAttr(b, 'name') ?? ''))].filter(Boolean),
+    notesParts: { footnotes: fn.present, endnotes: en.present },
   };
   return { doc, source: r.source, xml, pkg, revisionCount: revisionTotal(revisions), groups: r.groups };
 }

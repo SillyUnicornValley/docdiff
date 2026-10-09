@@ -55,6 +55,16 @@ const DROP_ALWAYS = new Set([
   'lastRenderedPageBreak', 'sectPr', 'rPrChange', 'pPrChange', 'tblPrChange', 'trPrChange', 'tcPrChange', 'tblGridChange', 'sectPrChange', 'numberingChange',
 ]);
 
+/** Elements copied as they are: drawings, VML pictures and equations. */
+function isIsland(el: Element): boolean {
+  return (isW(el) && (el.localName === 'drawing' || el.localName === 'pict' || el.localName === 'object')) || (el.namespaceURI === NS.m && (el.localName === 'oMath' || el.localName === 'oMathPara'));
+}
+
+function inIsland(el: Element, root: Element): boolean {
+  for (let a = el.parentElement; a && a !== root; a = a.parentElement) if (isIsland(a)) return true;
+  return false;
+}
+
 export interface ImportContext {
   oldStyles: StyleInfo[];
   newStyles: StyleInfo[];
@@ -84,25 +94,36 @@ export class Importer {
    * brought back on its own (direct formatting dropped); otherwise a table
    * or row that keeps its layout.
    */
-  import(oldEl: Element, restored: boolean): Element {
+  import(oldEl: Element, restored: boolean, track = true): Element {
     const el = this.doc.importNode(oldEl, true) as Element;
     this.sanitize(el);
-    if (restored) for (const p of [el, ...Array.from(el.getElementsByTagNameNS(NS.w, 'p'))].filter((x) => isW(x, 'p'))) this.reduceParagraph(p);
+    if (restored) for (const p of [el, ...Array.from(el.getElementsByTagNameNS(NS.w, 'p'))].filter((x) => isW(x, 'p') && !inIsland(x, el))) this.reduceParagraph(p);
     // A table cell must end with a paragraph.
     for (const tc of [el, ...Array.from(el.getElementsByTagNameNS(NS.w, 'tc'))].filter((x) => isW(x, 'tc'))) {
       if (!isW(tc.lastElementChild, 'p')) tc.appendChild(wEl(this.doc, 'p'));
     }
-    this.imported.push(el);
+    // `track`: inserted into the body later, so restored list items are fixed after insertion.
+    if (track) this.imported.push(el);
     return el;
   }
 
   private sanitize(root: Element) {
+    // Alternate content: keep what the reader read (the first choice), as plain content.
+    for (const ac of Array.from(root.getElementsByTagNameNS(NS.mc, 'AlternateContent')).reverse()) {
+      const pick = ac.getElementsByTagNameNS(NS.mc, 'Choice')[0] ?? ac.getElementsByTagNameNS(NS.mc, 'Fallback')[0];
+      if (pick) while (pick.firstChild) ac.parentNode!.insertBefore(pick.firstChild, ac);
+      remove(ac);
+    }
     const walk = (el: Element) => {
       for (const a of Array.from(el.attributes)) {
-        const keep = (a.namespaceURI === NS.w && !a.localName.startsWith('rsid')) || a.namespaceURI === XML_NS || a.name.startsWith('xmlns');
+        // Relationship ids stay: the carrier maps them to the new file (decision 43).
+        const keep =
+          (a.namespaceURI === NS.w && !a.localName.startsWith('rsid')) || a.namespaceURI === XML_NS || a.namespaceURI === NS.r || a.name.startsWith('xmlns');
         if (!keep) el.removeAttributeNode(a);
       }
       for (const c of elementChildren(el)) {
+        // Drawings and equations are copied whole (pictures and equations can come back, decision 43).
+        if (isIsland(c)) continue;
         if (!isW(c) || DROP_ALWAYS.has(c.localName)) {
           remove(c);
           continue;
@@ -139,7 +160,7 @@ export class Importer {
     const pPr = wChild(p, 'pPr');
     if (pPr) for (const c of elementChildren(pPr)) if (!isW(c, 'pStyle') && !isW(c, 'numPr')) remove(c);
     if (pPr && !pPr.firstElementChild) remove(pPr);
-    for (const r of wChildren(p, 'r')) {
+    for (const r of Array.from(p.getElementsByTagNameNS(NS.w, 'r')).filter((x) => !inIsland(x, p))) {
       const rPr = wChild(r, 'rPr');
       if (!rPr) continue;
       for (const c of elementChildren(rPr)) if (!KEEP_RUN_PROPS.has(c.localName)) remove(c);

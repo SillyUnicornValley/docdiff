@@ -19,7 +19,8 @@ import { parseDocx, type ParsedDocx } from '../docx/parseDocx';
 import { StyleMap } from '../docx/styles';
 import { DocxError, elementChildren, isW, NS, onOff, wChild, wVal } from '../docx/xml';
 import { wEl, insertAfter } from './dom';
-import { Importer, numberingFormats, styleList } from './importOld';
+import { Carrier } from './carry';
+import { Importer, numberingFormats, styleList, type ImportContext } from './importOld';
 import { ExportError, ParagraphEditor } from './paragraphEdit';
 import { selfCheck, type SelfCheck } from './selfCheck';
 import { normaliseSections, removeElements, tidy } from './structure';
@@ -62,6 +63,9 @@ function tocElements(first: Element): Element[] {
   return out;
 }
 
+/** Only text, tabs, line breaks and comment anchors: can be edited word by word (decision 24). */
+const isPlain = (p: ParagraphBlock) => p.content.every((i) => i.type === 'text' || i.type === 'tab' || i.type === 'break' || i.type === 'comment');
+
 class Exporter {
   private idx: { old: DocIndex; new: DocIndex };
   private removed = new Set<Element>();
@@ -78,6 +82,7 @@ class Exporter {
     private n: ParsedDocx,
     newStyles: StyleMap,
     importer: Importer,
+    private carrier: Carrier,
   ) {
     this.idx = { old: new DocIndex(result.old), new: new DocIndex(result.new) };
     this.importer = importer;
@@ -172,7 +177,17 @@ class Exporter {
     }
     // out === 'old'
     if (this.inPlace(d)) {
-      d.old.ids.forEach((oid, k) => this.editor.rewrite(this.el('new', d.new.ids[k]), this.idx.old.block(oid) as ParagraphBlock));
+      d.old.ids.forEach((oid, k) => {
+        const target = this.el('new', d.new.ids[k]);
+        const ob = this.idx.old.block(oid) as ParagraphBlock;
+        if (isPlain(ob) && isPlain(this.idx.new.block(d.new.ids[k]) as ParagraphBlock)) this.editor.rewrite(target, ob);
+        else {
+          // Footnotes, links, fields, pictures or equations on either side: replace the content (decision 43).
+          const src = this.importer.import(this.el('old', oid), true, false);
+          this.carrier.carryIntoBody(src);
+          this.editor.replaceContent(target, src);
+        }
+      });
       return;
     }
     const restored = d.old.ids.flatMap((oid) => this.importBlock(d, oid));
@@ -189,10 +204,11 @@ class Exporter {
   }
 
   private importBlock(d: Difference, oid: NodeId): Element[] {
-    if (d.old.unit === 'row') return [this.importer.import(this.el('old', oid), false)];
+    const carried = (e: Element) => (this.carrier.carryIntoBody(e), e);
+    if (d.old.unit === 'row') return [carried(this.importer.import(this.el('old', oid), false))];
     const b = this.idx.old.block(oid);
     if (b.kind === 'placeholder' && b.element !== 'toc') throw new ExportError('This element cannot be brought back.');
-    return this.blockEls('old', oid).map((e) => this.importer.import(e, b.kind === 'paragraph'));
+    return this.blockEls('old', oid).map((e) => carried(this.importer.import(e, b.kind === 'paragraph')));
   }
 
   /** Insert old elements where segment i sits: after the previous segment's content, else before the next. */
@@ -261,16 +277,20 @@ export async function exportClean(oldFile: ExportFile, newFile: ExportFile, resu
   };
   const [os, ns, on, nn] = await Promise.all([read(o, '/styles'), read(n, '/styles'), read(o, '/numbering'), read(n, '/numbering')]);
   const newStyleMap = new StyleMap(ns);
-  const importer = new Importer(n.xml, {
+  const ctx: ImportContext = {
     oldStyles: styleList(os),
     newStyles: styleList(ns),
     oldStyleMap: new StyleMap(os),
     newStyleMap,
     oldNumbering: numberingFormats(on),
     newNumbering: numberingFormats(nn),
-  });
-  const ex = new Exporter(result, choices, o, n, newStyleMap, importer);
+  };
+  const importer = new Importer(n.xml, ctx);
+  const carrier = new Carrier(o, n);
+  await carrier.init((doc) => new Importer(doc, ctx));
+  const ex = new Exporter(result, choices, o, n, newStyleMap, importer, carrier);
   ex.run();
+  await carrier.finish();
 
   n.pkg.zip.file(n.pkg.documentPath, serialize(n.xml));
   await setUpdateFields(n.pkg);
