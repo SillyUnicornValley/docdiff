@@ -2,7 +2,7 @@
 
 > 这是项目的总入口，只做概括和链接。现行规则在 `spec/`，决定索引在 `decisions.md`。
 > **每完成一个阶段或做出新决定，更新本文件的「状态」部分。**
-> 最后更新：2026-10-08（v0.3.0）
+> 最后更新：2026-10-09（v0.3.1）
 
 ---
 
@@ -69,14 +69,14 @@
 |---|---|---|---|---|
 | 1 | 界面原型（mock 数据） | ✅ 完成 | v0.1.0 | [spec/ui.md](spec/ui.md) |
 | 2 | 主体内容比较（解析、对齐、移动识别、词级差异） | ✅ 完成（M1–M6） | v0.2.0 | [stage2-design](implementation/stage2-design.md) |
-| 3 | 合并与 Clean 导出（结构保护、撤销、进度、自检） | ✅ 完成 | v0.3.0 | [stage3-design](implementation/stage3-design.md) |
-| 4 | Track Changes 导出 | ⬜ 未开始 | — | [export §3](spec/export.md) |
+| 3 | 合并与 Clean 导出（结构保护、撤销、进度、自检） | ✅ 完成 | v0.3.0；v0.3.1 说明改为浮窗（决定 40） | [stage3-design](implementation/stage3-design.md) |
+| 4 | Track Changes 导出 | ⏸ 暂缓（决定 39） | — | [export §3](spec/export.md) |
 | 5 | 扩展检查（格式、段内词级选择、批注等） | ⬜ 未开始 | — | [scope §4](spec/scope.md) |
 | 6 | Excel | ⬜ 未开始 | — | — |
 
 ### 4.2 验收标准（全文见 [scope §5](spec/scope.md)）
 
-✅ 已满足且有自动测试　⚠️ 部分满足 / 还缺验证　⬜ 未做
+✅ 已满足且有自动测试　⚠️ 部分满足 / 还缺验证　⬜ 未做　⏸ 暂缓
 
 | # | 验收标准（简写） | 状态 | 依据 |
 |---|---|---|---|
@@ -92,7 +92,7 @@
 | 10 | 自动编号顺延不算变化（只以 № 提示，决定 38） | ✅ | `engine.test.ts` 02；`parseDocx.test.ts` 02；`hints.test.ts` 02 |
 | 11 | 采用旧版不破坏分节、页面设置、书签、批注结构 | ✅ | `export.test.ts`（05、09、书签和批注标记） |
 | 12 | Clean 导出无未决修订，保留批注和样式，Word 能正常打开 | ⚠️ | 前两点有测试（`export.test.ts` 04、12），64 个导出文件通过 XSD 校验；**还没有在 Windows Word 中实际打开过** |
-| 13 | Track Changes 导出只反映新版到最终版的差异 | ⬜ | Stage 4 |
+| 13 | Track Changes 导出只反映新版到最终版的差异 | ⏸ | Stage 4 暂缓（决定 39） |
 | 14 | 原始上传文件不变 | ✅ | 按设计成立：浏览器只读上传文件，导出另存新文件 |
 | 15 | 没比较的内容有说明和占位 | ✅ | `engine.test.ts` 05 检查范围；`parseDocx.test.ts` 05 |
 | 16 | 进度可保存，在同样两份文件上恢复 | ✅ | `reviewOps.test.ts` progress files；`engine.test.ts` 编号稳定 |
@@ -113,13 +113,13 @@
 - 复制的旧版表格引用了新版没有的表格样式时，只保留直接设置的边框和底纹
 
 **后续阶段**
-- [ ] Stage 4：Track Changes 导出
+- [ ] Stage 4：Track Changes 导出（暂缓，决定 39；导出的修改计划已为它预留，见 [export §3](spec/export.md)）
 - [ ] Stage 5：格式检查（含列表类型）、未比较元素逐项比较、带回含脚注等元素的旧版内容、段内词级选择、批注处理
 - [ ] Stage 6：Excel
 
 **仓库整理**
-- [ ] `tsconfig.tsbuildinfo` 是本机编译缓存，应该加进 `.gitignore` 并从 git 移除
-- [ ] 确认 `testdocs/docs/real examples/` 里的公司文档可以留在 repo 中
+- [x] `tsconfig.tsbuildinfo` 是本机编译缓存，已加进 `.gitignore` 并从 git 移除
+- [x] `testdocs/docs/real examples/` 里的公司文档可以留在 repo 中（用户确认，2026-10-09）
 
 ---
 

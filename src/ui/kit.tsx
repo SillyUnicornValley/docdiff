@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export function Popover({ label, title, children, align = 'left' }: { label: ReactNode; title?: string; children: (close: () => void) => ReactNode; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false);
@@ -23,6 +24,88 @@ export function Popover({ label, title, children, align = 'left' }: { label: Rea
       </button>
       {open && <div className={`popover-panel align-${align}`}>{children(() => setOpen(false))}</div>}
     </div>
+  );
+}
+
+/**
+ * Explanation shown on demand (decision 40): the page keeps a short label, the
+ * "why / what to do" opens on hover at once, or on focus or click (touch) of the
+ * ⓘ. `icon={false}` for marks inside the document text, where an ⓘ on every
+ * mark would be clutter: the mark itself then takes focus and clicks.
+ */
+export function Tip({ tip, children, icon = true, className }: { tip: ReactNode; children?: ReactNode; icon?: boolean; className?: string }) {
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const open = hover || pinned;
+
+  useLayoutEffect(() => {
+    if (!open || !ref.current) return setPos(null);
+    const r = ref.current.getBoundingClientRect();
+    const w = tipRef.current?.offsetWidth ?? 300;
+    const h = tipRef.current?.offsetHeight ?? 80;
+    const above = r.bottom + 6 + h > window.innerHeight && r.top - 6 - h > 0;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    setPos({ left, top: above ? r.top - 6 - h : r.bottom + 6, above });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => {
+      setHover(false);
+      setPinned(false);
+    };
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [open]);
+
+  const toggle = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    setPinned((v) => !v);
+  };
+  return (
+    <span
+      ref={ref}
+      className={`tip-anchor${icon ? '' : ' tip-self'}${className ? ` ${className}` : ''}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
+      {...(icon ? {} : { tabIndex: 0, onClick: toggle, 'aria-describedby': open ? id : undefined })}
+    >
+      {children}
+      {icon && (
+        <button type="button" className="tip-icon" aria-label="More information" aria-describedby={open ? id : undefined} aria-expanded={open} onClick={toggle}>
+          ⓘ
+        </button>
+      )}
+      {open &&
+        createPortal(
+          <div
+            ref={tipRef}
+            id={id}
+            role="tooltip"
+            className="tip"
+            style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }}
+          >
+            {tip}
+          </div>,
+          document.body,
+        )}
+    </span>
   );
 }
 

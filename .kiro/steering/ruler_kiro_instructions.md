@@ -12,7 +12,7 @@ A browser-only tool for comparing and merging two Word (.docx) files. It targets
 
 - **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). UI decisions A1–A12 are in `docs/decisions.md` §2.
 - **Stage 2 (done, v0.2.0):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/implementation/stage2-design.md`. Milestones M1–M6 are done; sample pairs are the built-in testdocs (`src/samples.ts`), and the hand-written mocks appear with `?mock`.
-- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Not done yet: Track Changes export. Difference granularity rules G1–G12 (`docs/spec/comparison.md` §2.2) were confirmed by the user (decisions 35–36).
+- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Track Changes export (Stage 4) is postponed (decision 39). v0.3.1 moves explanations into hover popovers (decision 40). Difference granularity rules G1–G12 (`docs/spec/comparison.md` §2.2) were confirmed by the user (decisions 35–36).
 
 ## Commands
 

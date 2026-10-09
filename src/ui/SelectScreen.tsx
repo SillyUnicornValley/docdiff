@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { MOCK_PAIRS, type MockPair } from '../mock';
 import { SAMPLE_PAIRS, type SamplePair } from '../samples';
 import { APP_VERSION, BUILD_DATE } from '../version';
+import { Tip } from './kit';
 
 export interface Slot {
   name: string;
@@ -119,8 +120,9 @@ export function SelectScreen({
           <SlotCard role="new" slot={slots.new} onFile={(f) => onFile('new', f)} onClear={() => onClear('new')} />
         </div>
         <div className="notice">
-          <b>Existing tracked changes:</b> both files are compared as if all existing tracked changes were accepted. Your original files are not modified. If the new file
-          has pending tracked changes, they are accepted in the exported file — you will see how many before exporting.
+          <Tip tip="Both files are compared as if all existing tracked changes were accepted. Your original files are not modified. If the new file has pending tracked changes, they are accepted in the exported file — you will see how many before exporting.">
+            <b>Existing tracked changes</b> are accepted before comparing.
+          </Tip>
         </div>
         <div className="compare-row">
           <button className="btn btn-primary btn-big" disabled={!ready} onClick={onCompare}>

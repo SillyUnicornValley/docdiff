@@ -1756,3 +1756,47 @@ table.from-old-row td {
 .link.numbering {
   color: #0a6c74;
 }
+
+/* explanations on demand (decision 40) */
+.tip-anchor {
+  display: inline;
+}
+.tip-self {
+  cursor: help;
+}
+.tip-self:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tip-icon {
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 0.95em;
+  line-height: 1;
+  cursor: help;
+  vertical-align: baseline;
+}
+.tip-icon:hover,
+.tip-icon[aria-expanded='true'] {
+  color: var(--accent);
+}
+.tip {
+  position: fixed;
+  z-index: 100;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(31, 35, 40, 0.15);
+  font: 12px/1.45 var(--ui-font);
+  font-style: normal;
+  font-weight: normal;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}

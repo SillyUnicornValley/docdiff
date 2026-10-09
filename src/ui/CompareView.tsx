@@ -8,7 +8,7 @@ import type { ExportResult } from '../engine';
 import { APP_VERSION } from '../version';
 import { ExportDialog } from './ExportDialog';
 import { finalRowContent } from './finalView';
-import { downloadText, Popover, yyyymmdd, type ConfirmRequest } from './kit';
+import { downloadText, Popover, Tip, yyyymmdd, type ConfirmRequest } from './kit';
 import { CATEGORY_LABEL, KIND_LABEL, STATUS_LABEL } from './labels';
 import { BlockView, hasNewComment, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
 import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
@@ -354,26 +354,38 @@ export function CompareView({
           </header>
 
           <div className="infobar">
-            <span>ⓘ Compared as if all existing tracked changes were accepted. Original files are not modified.</span>
+            <Tip tip="Both files are compared as if all their existing tracked changes were accepted. Your original files are not modified.">
+              <span>Tracked changes accepted</span>
+            </Tip>
             {unsupported > 0 && (
-              <button className="link warn" onClick={() => setPanel('scope')}>
-                ⚠ {unsupported} table cell tracked change(s) — results in those tables may be inaccurate
-              </button>
+              <Tip tip="These tables contain tracked changes to their cells. They were accepted before comparing, but the result in those tables may be inaccurate. Check them in Word. Click to list them.">
+                <button className="link warn" onClick={() => setPanel('scope')}>
+                  ⚠ {unsupported} table cell tracked change(s) — results may be inaccurate
+                </button>
+              </Tip>
             )}
             {levelList.length > 0 && (
-              <button className="link level" onClick={() => setPanel('scope')}>
-                ⚑ {levelList.length} heading level change(s) — flagged in the text, not choosable
-              </button>
+              <Tip tip="Flagged in the text with ⚑. Shown only, not choosable: the export keeps the new file's heading levels. Click to list them.">
+                <button className="link level" onClick={() => setPanel('scope')}>
+                  ⚑ {levelList.length} heading level change(s)
+                </button>
+              </Tip>
             )}
             {structure.numbering.length > 0 && (
-              <button className="link numbering" onClick={() => setPanel('scope')}>
-                № {structure.numbering.length} automatic numbering change(s){opts.showNumbering ? ' — marked in the text, not choosable' : ' — marks hidden (View)'}
-              </button>
+              <Tip
+                tip={`${opts.showNumbering ? 'Marked in the text with №.' : 'Marks are hidden (turn them on in View).'} Shown only, not choosable: Word calculates the numbers from the list structure, so the export keeps the new file's numbering. Click to list them.`}
+              >
+                <button className="link numbering" onClick={() => setPanel('scope')}>
+                  № {structure.numbering.length} automatic numbering change(s)
+                </button>
+              </Tip>
             )}
             {mayDiffer > 0 && (
-              <button className="link" onClick={() => setPanel('scope')}>
-                {mayDiffer} not-compared part(s) may differ
-              </button>
+              <Tip tip="Parts that docdiff does not compare (such as headers, footers or images) look different in the two files. Check them in Word. Click to list them.">
+                <button className="link" onClick={() => setPanel('scope')}>
+                  {mayDiffer} not-compared part(s) may differ
+                </button>
+              </Tip>
             )}
           </div>
 
@@ -603,9 +615,10 @@ function ViewMenu({
             <input type="checkbox" checked={opts.compareFields} onChange={(e) => set('compareFields', e.target.checked)} /> Compare date, page and other fields
             {!hasInfo('fields') && <span className="muted"> (none in this pair)</span>}
           </label>
-          <label title="Marks paragraphs whose automatic number differs (e.g. 3. → 4. after an inserted item). Shown only; the export keeps the new numbering.">
+          <label>
             <input type="checkbox" checked={opts.showNumbering} onChange={(e) => set('showNumbering', e.target.checked)} /> Mark automatic numbering changes
             <span className="muted"> ({numberingCount})</span>
+            <Tip tip="Marks paragraphs whose automatic number differs (e.g. 3. → 4. after an inserted item). Shown only; the export keeps the new numbering." />
           </label>
         </div>
       )}
@@ -693,8 +706,8 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
       </div>
       {d.category && !compact && <div className="g-cat">{CATEGORY_LABEL[d.category]}</div>}
       {d.informational ? (
-        <div className="g-info" title="Optional comparison: shown for information only. The final result always keeps the new version.">
-          Info only · not choosable
+        <div className="g-info">
+          <Tip tip="Optional comparison (turned on in View): shown for information only, not choosable. The final result always keeps the new version.">Info only</Tip>
         </div>
       ) : (
         <>
@@ -725,8 +738,8 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
             </button>
           </div>
           {!d.useOld.available && (
-            <div className="g-why" title={d.useOld.message}>
-              ⓘ Use old unavailable: {d.useOld.message.split('.')[0].replace(/^Contains /, '').toLowerCase()}
+            <div className="g-why">
+              <Tip tip={d.useOld.message}>Use old unavailable</Tip>
             </div>
           )}
           {status !== 'unreviewed' && !compact && (
@@ -754,16 +767,20 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
         </button>
       )}
       {movedAndChanged(d) && (
-        <div className="g-moved-changed" title="The text was also edited when it was moved. The changes are highlighted in both places.">
-          ✎ Moved and text changed
+        <div className="g-moved-changed">
+          <Tip tip="The text was also edited when it was moved. The changes are highlighted in both places.">✎ Moved and text changed</Tip>
         </div>
       )}
       {!compact && hasNewComment(d, ix) && (
-        <div className="g-note g-comment" title="Comments in the new file are kept on export. If you use old here or remove this text, check in Word where the comment ends up.">
-          Has a new-file comment
+        <div className="g-note g-comment">
+          <Tip tip="Comments in the new file are kept on export. If you use old here or remove this text, check in Word where the comment ends up.">Has a new-file comment</Tip>
         </div>
       )}
-      {d.kind === 'tableStructure' && !compact && <div className="g-note">Table structure changed — v1 offers a whole-table choice only.</div>}
+      {d.kind === 'tableStructure' && !compact && (
+        <div className="g-note">
+          <Tip tip="The table structure changed (rows or columns added, removed or merged), so rows cannot be chosen one by one. Use old or Use new replaces the whole table.">Whole-table choice</Tip>
+        </div>
+      )}
       {d.summary && !compact && <div className="g-summary">{d.summary}</div>}
     </div>
   );

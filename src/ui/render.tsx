@@ -7,6 +7,7 @@ import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff'
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { StructureChange } from '../model/hints';
 import type { Choice } from '../model/review';
+import { Tip } from './kit';
 import { isHidden, type Indexes, type SectionMarker, type SectionMarkers, type Visibility } from './rows';
 
 // ---------------------------------------------------------------------------
@@ -82,9 +83,11 @@ function PlaceholderChip({ p, mayDiffer }: { p: InlinePlaceholder; mayDiffer?: b
       ? 'Footnote reference: marker position is compared; footnote text is detected only.'
       : 'Shown, not compared in v1.';
   return (
-    <span className={`ph-chip ph-${p.kind}${mayDiffer ? ' may-differ' : ''}`} title={title + (mayDiffer ? ' The two versions may differ — check in Word.' : '')}>
-      [{p.label} · {note}]{mayDiffer && <span className="may-badge">may differ</span>}
-    </span>
+    <Tip icon={false} tip={title + (mayDiffer ? ' The two versions may differ — check in Word.' : '')}>
+      <span className={`ph-chip ph-${p.kind}${mayDiffer ? ' may-differ' : ''}`}>
+        [{p.label} · {note}]{mayDiffer && <span className="may-badge">may differ</span>}
+      </span>
+    </Tip>
   );
 }
 
@@ -140,9 +143,9 @@ function WrapView({ wrap, compareFields, children }: { wrap: PieceWrap; compareF
 
 function CommentMark({ c }: { c: CommentInline }) {
   return (
-    <span className="comment-mark" title={`Comment by ${c.author} in the new file: “${c.preview}”. Shown only, not compared. Comments in the new file are kept on export.`}>
-      Comment · {c.author}
-    </span>
+    <Tip icon={false} tip={`Comment by ${c.author} in the new file: “${c.preview}”. Shown only, not compared. Comments in the new file are kept on export.`}>
+      <span className="comment-mark">Comment · {c.author}</span>
+    </Tip>
   );
 }
 
@@ -233,26 +236,24 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
         </span>
       )}
       {num && (
-        <span
-          className="num-mark"
-          title="Automatic numbering differs between the two files. Shown only, not choosable: Word recalculates numbers, and the export keeps the new file's numbering. Hide these marks in View."
-        >
-          № {num.oldLabel} → {num.newLabel}
-        </span>
+        <Tip icon={false} tip="Automatic numbering differs between the two files. Shown only, not choosable: Word calculates the numbers from the list structure, so the export keeps the new file's numbering. Hide these marks in View.">
+          <span className="num-mark">
+            № {num.oldLabel} → {num.newLabel}
+          </span>
+        </Tip>
       )}
       {empty ? <span className="empty-mark" title="Empty paragraph">¶ empty paragraph</span> : out}
       {level && (
-        <span
-          className="level-mark"
-          title="Heading level changed. Shown only, not choosable: the export keeps the new file's level. Change it in Word after export if needed."
-        >
-          ⚑ {level.oldLabel} → {level.newLabel}
-        </span>
+        <Tip icon={false} tip="Heading level changed. Shown only, not choosable: the export keeps the new file's level. Change it in Word after export if needed.">
+          <span className="level-mark">
+            ⚑ {level.oldLabel} → {level.newLabel}
+          </span>
+        </Tip>
       )}
       {p.sectionBreak && (
-        <span className="section-break" title="This paragraph carries a section break. If it is removed, the break moves to the neighbouring paragraph.">
-          ⸺ Section break ⸺
-        </span>
+        <Tip icon={false} tip="This paragraph carries a section break. If it is removed, the break moves to the neighbouring paragraph.">
+          <span className="section-break">⸺ Section break ⸺</span>
+        </Tip>
       )}
       {p.sectionBreak && sections.afterBreak.get(p.id) && <SectionMarkerView m={sections.afterBreak.get(p.id)!} />}
     </div>
@@ -268,7 +269,7 @@ const RESULT_LABEL = { same: 'same', mayDiffer: 'may differ', onlyOld: 'section 
 
 export function SectionMarkerView({ m }: { m: SectionMarker }) {
   return (
-    <div className="sec-marker" title="Headers and footers are detected only: docdiff tells you whether they may differ, not what changed. Check in Word.">
+    <div className="sec-marker">
       <b>§ Section {m.section}</b>
       {m.hints.map((h, i) => (
         <span key={i} className={`sec-hint sec-${h.result}`}>
@@ -276,7 +277,7 @@ export function SectionMarkerView({ m }: { m: SectionMarker }) {
           {VARIANT_LABEL[h.variant]} · {RESULT_LABEL[h.result]}
         </span>
       ))}
-      <span className="sec-note">not compared item by item · check in Word</span>
+      <Tip tip="Headers and footers are detected only: docdiff tells you whether they may differ, not what changed. Check them in Word." />
     </div>
   );
 }
