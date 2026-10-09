@@ -51,6 +51,12 @@
 | 38 | 10-09 | 自动编号不同要不要显示 | 显示：编号旁标 “№ 旧 → 新”，默认开、可在 View 关闭；只提示，不能选择 | [comparison §6](spec/comparison.md)、[ui §3](spec/ui.md) |
 | 39 | 10-09 | 下一步是否做 Track Changes 导出（Stage 4） | 暂缓；修改计划仍为它预留，以后需要时再做 | [export §1、§3](spec/export.md)、[scope §2](spec/scope.md) |
 | 40 | 10-09 | 说明文字放在哪里 | 主页面只放短标签（“是什么”），“为什么、怎么办”放进浮窗：标签旁加 ⓘ，鼠标移上去立即出现，键盘聚焦或点击也能打开。影响结果正确性的警告仍在页面上保留短句。按钮的快捷键提示仍用浏览器自带提示 | [ui §3](spec/ui.md) |
+| 41 | 10-10 | Stage 5 的范围和顺序（用户授权开发方先行决定） | 五项都做：段内逐处选择、带回含脚注等元素的旧内容可以选择；格式、其他部分、批注只提示、不能选择，导出保留新版。版本 v0.5.0，引擎 engine-5 | [stage5-design](implementation/stage5-design.md) §1、[scope §4](spec/scope.md) |
+| 42 | 10-10 | 段内逐处选择（G6 的段内展开） | 一对一的修改段落、有 2 处以上词级变化时，可展开 “Choose per change” 逐处选 Old / New；状态 “Mixed”；整段按钮照旧；进度文件 formatVersion 2 | [comparison §2.2](spec/comparison.md) G6、[merge §2](spec/merge.md) |
+| 43 | 10-10 | 含脚注、超链接、域、图片、公式的旧内容能否带回 | 能：复制链接地址、图片、脚注（尾注）进新版；修改段落含这些元素时整段替换内容（保留段落属性和新版标记）。仍不可用：图表、形状、SmartArt、文本框、嵌入对象、链接的图片、引用新版中不存在书签的交叉引用、新版没有脚注（尾注）部件；只看旧版一侧。自检加比脚注文字、图片、链接地址 | [merge §3](spec/merge.md)、[export §2.5、§4](spec/export.md) |
+| 44 | 10-10 | 格式检查 | 比较配对段落和表格的段落样式、对齐、缩进、间距、列表类型、文字格式（加粗、斜体、下划线、删除线、大写、字体、字号、颜色、突出显示）、表格样式；按生效格式比较；Formatting 标签页列出，正文标 “Aa”；只提示，导出保留新版格式；标题级别变化的段落不列入（⚑ 已提示） | [comparison §1、§9](spec/comparison.md)、[ui §3](spec/ui.md) |
+| 45 | 10-10 | 原来“只检测”的部分 | 新增 Other parts 标签页逐项比较：脚注、尾注、页眉页脚（按节）、文本框、超链接地址、图片、文档属性；只提示，导出保留新版 | [comparison §5、§8](spec/comparison.md)、[ui §3](spec/ui.md) |
+| 46 | 10-10 | 批注处理 | 旧版批注也显示（灰色 “Old comment”）；Other parts › Comments 逐条比较（相同、批注文字改了、锚定文字改了、只在一边）；导出仍只保留新版批注、不带入旧版批注；导出前提示有几处 Use old 的内容挂着新版批注 | [comparison §5](spec/comparison.md)、[export §1](spec/export.md) |
 
 ## 2. 界面决定 A1–A12（原型阶段，2026-10-07）
 

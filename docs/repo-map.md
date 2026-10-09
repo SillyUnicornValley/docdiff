@@ -46,7 +46,7 @@ docdiff/
 |---|---|
 | `main.tsx` | React 启动入口：挂载 `<App>`，引入样式。 |
 | `version.ts` | 把构建时注入的版本号、构建日期导出给 UI。 |
-| `samples.ts` | 选择页上的"示例文档对"：把 `testdocs/docs/` 01–07 的 .docx 内置进页面，点一下就用真引擎比较（不包含 `real examples/`）。 |
+| `samples.ts` | 选择页上的"示例文档对"：把 `testdocs/docs/` 01–18 的 .docx 内置进页面，点一下就用真引擎比较（不包含 `real examples/`）。 |
 
 ### `src/model/` —— 数据模型（引擎和 UI 共用的"合同"）
 
@@ -57,7 +57,9 @@ docdiff/
 | `review.ts` | 用户的选择（每条差异选 new/old），与 DiffResult 分开存；没选的算 new。 |
 | `reviewOps.ts` | 对选择状态的纯函数操作 + 撤销/重做历史。 |
 | `final.ts` | 由选择拼出"最终结果"。 |
-| `useOld.ts` | 判断某条差异能不能"Use old"（含脚注、图片、超链接、域等时禁止）。 |
+| `useOld.ts` | 判断某条差异能不能"Use old"：引擎用 Stage 5 规则（只看旧版一侧能否安全复制进新版），mock 仍用 Stage 3 规则。 |
+| `selection.ts` | 段内逐处选择（决定 42）：选择的归一化、校验，以及按逐处选择拼出最终段落。 |
+| `hints.ts` | 配对段落和表格；标题级别（⚑）、自动编号（№）的提示。 |
 | `scope.ts` | "检查范围"面板的数据：哪些内容比较了 / 只检测 / 只显示。 |
 | `flatten.ts` | 段落展平为文本的规则（tab→`\t` 等），文本偏移量都基于它。 |
 | `docIndex.ts` | 按 id 查找块/行/单元格。 |
@@ -71,12 +73,12 @@ docdiff/
 | `index.ts` | 引擎入口：两个 .docx → DiffResult。解析在主线程，比较在 Web Worker。 |
 | `compare.worker.ts` | Web Worker：在后台线程跑比较，避免页面卡死。 |
 | `hash.ts` | 指纹：内容用快速哈希，文件用 SHA-256（自动保存/进度文件识别同一对文件）。 |
-| `docx/` | **读取 .docx**：`package.ts` 打开 zip 包并解析关系；`acceptRevisions.ts` 先接受所有已有修订；`readBody.ts` 读正文成 DocModel；`styles.ts` 标题级别/样式继承；`numbering.ts` 计算 Word 显示的自动编号（"3."、"a)"）；`xml.ts` DOM 小工具；`parseDocx.ts` 串起来。 |
+| `docx/` | **读取 .docx**：`package.ts` 打开 zip 包并解析关系；`acceptRevisions.ts` 先接受所有已有修订；`readBody.ts` 读正文成 DocModel；`styles.ts` 标题级别/样式继承；`formatting.ts` 生效格式（格式检查用）；`numbering.ts` 计算 Word 显示的自动编号（"3."、"a)"）；`xml.ts` DOM 小工具；`parseDocx.ts` 串起来。 |
 | `align/` | **序列对齐**：`myers.ts` 经典 Myers diff；`alignBlocks.ts` 先用唯一内容做锚点再对齐段落/表格行。 |
-| `compare/` | **生成 DiffResult**：`compare.ts` 主流程（正文、单元格、嵌套表格同一套逻辑）；`wordDiff.ts` 段落内逐词比较与相似度；`keys.ts` 内容键；`sections.ts` 按内容配对节并提示页眉页脚差异；`scopeRows.ts` 统计"只检测"项。 |
-| `export/` | **Stage 3 导出 Clean .docx**：`exportDocx.ts` 主流程（以接受修订后的新文件为底，套用用户选择）；`paragraphEdit.ts` 对修改过的段落就地改回旧文本；`importOld.ts` 把旧文件内容搬进来；`structure.ts` 删除内容时保护书签/批注等结构；`dom.ts` 写 XML 的工具（保证元素顺序符合 schema）；`selfCheck.ts` 导出后重新读取并与预览逐块核对。 |
+| `compare/` | **生成 DiffResult**：`compare.ts` 主流程（正文、单元格、嵌套表格同一套逻辑）；`wordDiff.ts` 段落内逐词比较与相似度；`keys.ts` 内容键；`sections.ts` 按内容配对节并提示页眉页脚差异；`scopeRows.ts` 统计"只检测"项；`formatting.ts` 格式检查（决定 44）；`otherParts.ts` 脚注、页眉页脚、文本框、链接、图片、属性、批注的逐项比较（决定 45、46）。 |
+| `export/` | **Stage 3 导出 Clean .docx**：`exportDocx.ts` 主流程（以接受修订后的新文件为底，套用用户选择）；`paragraphEdit.ts` 对修改过的段落就地改回旧文本；`importOld.ts` 把旧文件内容搬进来；`carry.ts` 把旧内容引用的链接、图片、脚注复制进新文件（决定 43）；`structure.ts` 删除内容时保护书签/批注等结构；`dom.ts` 写 XML 的工具（保证元素顺序符合 schema）；`selfCheck.ts` 导出后重新读取并与预览逐块核对。 |
 | `testing/` | 测试辅助：`files.ts` 读 testdocs；`makeDocx.ts` 用一段 XML 造最小 .docx。 |
-| `*.test.ts` | 引擎测试（`engine`、`advanced` = testdocs 08–15、`boundaries`、`export`、`parseDocx`、`myers`）。 |
+| `*.test.ts` | 引擎测试（`engine`、`advanced` = testdocs 08–15、`stage5` = testdocs 16–18、`boundaries`、`export`、`parseDocx`、`myers`）。 |
 
 ### `src/ui/` —— React 界面
 
@@ -89,6 +91,8 @@ docdiff/
 | `render.tsx` | 段落/表格的渲染与逐词高亮。 |
 | `finalView.tsx` | "最终结果"视图，标出来自旧文件的内容。 |
 | `ScopePanel.tsx` | 检查范围面板。 |
+| `FormattingTab.tsx` | Formatting 标签页：格式不同之处的列表（决定 44）。 |
+| `OtherPartsTab.tsx` | Other parts 标签页：批注、脚注、页眉页脚、文本框、链接、图片、属性（决定 45、46）。 |
 | `ExportDialog.tsx` | 导出对话框。 |
 | `autosave.ts` | 浏览器本地自动保存选择（辅助手段，进度文件才是正式保存方式）。 |
 | `kit.tsx` | 通用小组件和工具（如保存文件，兼容 claude.ai Artifact 的下载方式）。 |
@@ -112,7 +116,7 @@ URL 带 `?mock` 时使用。`builder.ts` 用"相同/变化"描述快速造出 Di
 | `overview.md` | **总入口**：目标、设计原则、架构、阶段状态、验收标准逐条状态、待办总清单、文档索引。 |
 | `decisions.md` | 决定索引：第 1–32 条和界面决定 A1–A12，每条一行，链接到写进的主题文档。代码里的 "decision N" 指这里。 |
 | `spec/` | 现行规则，按主题拆分：`scope`（目标、范围、部署、验收标准）、`reading`（支持的文件、已有修订）、`comparison`（比较规则、颗粒度 G1–G12、元素逐项状态）、`merge`（合并模型）、`export`（导出规则）、`ui`（界面与进度）。代码里的 "spec/xxx §n" 指这里。 |
-| `implementation/` | 技术设计：`stage2-design.md`（解析和比较引擎，里程碑 M1–M6）、`stage3-design.md`（导出实现、自检、XSD 校验）。 |
+| `implementation/` | 技术设计：`stage2-design.md`（解析和比较引擎，里程碑 M1–M6）、`stage3-design.md`（导出实现、自检、XSD 校验）、`stage5-design.md`（扩展检查）。 |
 | `archive/` | 不再维护的原文快照（设计审阅 v0.1、原型说明），以及旧章节号到新文件的对照表。 |
 | `dev guidance/` | `prototype-test-guide.md` 手工测试步骤；`ruler-workflow.md` AI agent 指令的管理方法。 |
 | `repo-map.md` | 本文件。 |
@@ -126,6 +130,7 @@ URL 带 `?mock` 时使用。`builder.ts` 用"相同/变化"描述快速造出 Di
 | `README.md` | 每对测试文档的**预期结果**。 |
 | `build_testdocs.py` | 生成 01–07 号文档对（基础文本、列表、表格、修订、批注、边界对齐、长文档）。 |
 | `build_testdocs_advanced.py` | 生成 08–15 号（导出格式、节与页眉、复杂表格、域与控件、修订+批注、重排与重复、Unicode、真实 SOP）。 |
+| `build_testdocs_stage5.py` | 生成 16–18 号（格式、脚注链接图片、批注），Stage 5 用。 |
 | `docs/*_old.docx` / `*_new.docx` | 生成好的文档对；`07`、`15` 另有 `*_changes.txt` 列出改了什么。 |
 | `docs/real examples/` | 两份真实的 Data Management Plan（v1.01 和 V3.02），用来手工试真实文件。**注意：已提交进 git**，如果是公司内部文件，请确认可以放在 repo 里；`samples.ts` 不会把它们打进页面。 |
 

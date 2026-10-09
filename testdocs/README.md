@@ -1,6 +1,6 @@
 # 测试文档
 
-`docs/` 下是成对的旧版／新版 `.docx`，由 `build_testdocs.py`（01–07）和 `build_testdocs_advanced.py`（08–15）生成，仅用 Python 标准库，直接写 OOXML。重新生成：
+`docs/` 下是成对的旧版／新版 `.docx`，由 `build_testdocs.py`（01–07）、`build_testdocs_advanced.py`（08–15）和 `build_testdocs_stage5.py`（16–18）生成，仅用 Python 标准库，直接写 OOXML。重新生成：
 
 ```bash
 python3 testdocs/build_testdocs.py
@@ -10,6 +10,7 @@ python3 testdocs/build_testdocs.py
 
 - 01–07：基础场景，每组针对一类问题。
 - 08–15（2026-10-08 新增）：更复杂、更接近真实文档的场景，也是导出（Stage 3）的主要测试对象。用户准备的真实文档未必覆盖设计中讨论过的各种情况，这一组用来补足。
+- 16–18（2026-10-10 新增）：Stage 5 的格式检查、带回含脚注等元素的旧内容、其他部分和批注比较。
 - `real examples/`：用户提供的真实文档（不打包进单文件）。
 
 全部 30 个文件已通过 OOXML XSD 校验，但**尚未在 Windows Word 中实际打开检查**。请在公司电脑上用 Word 打开确认一次，尤其是 04、05、09、11、12。
@@ -237,3 +238,36 @@ python3 testdocs/build_testdocs.py
 - 定义表一格修改、一行新增；检查表一行新增；签名表一格修改；
 - 页眉和脚注文字变化：检查范围中提示 “may differ”。
 
+
+## 16-formatting 只改格式
+
+| 内容 | 期望结果 |
+|---|---|
+| 一个词加粗、去掉颜色、换字体字号、居中、加段后间距和缩进 | 无内容差异；Formatting 逐条列出（决定 44） |
+| 旧版用 “Strong Note” 样式（样式加粗），新版 Normal + 直接加粗 | 只报“段落样式 Strong Note → Normal”，不报加粗 |
+| 字符样式斜体 ↔ 直接斜体 | 不报 |
+| `4 weeks` → `6 weeks`，同段 “Visits” 变斜体、“treatment” 加突出显示 | 一处内容差异；格式另报斜体和突出显示 |
+| 项目符号列表 → 编号列表 | 三条 “List type: Bullet • → Numbered 1.”，另有 № 编号提示 |
+| 表格样式 Table Grid → Light List | “Table style” |
+
+## 17-notes-links-images 脚注、链接、图片
+
+| 内容 | 期望结果 |
+|---|---|
+| 修改段落：旧版有脚注，新版没有 | 可以 Use old；整段替换内容，脚注复制进新版（决定 43） |
+| 修改段落：两版都有脚注，脚注文字改了 | 可以 Use old；Other parts 中 “Footnote 2 → 1 · Changed” |
+| 删除的段落：含超链接和带链接的脚注；图片；公式 | 可以 Use old；链接、图片、脚注（及脚注里的链接）复制进新版 |
+| 交叉引用指向两版都有的书签 | 可以 Use old |
+| 交叉引用指向只在旧版的书签 | Use old 不可用（bookmark） |
+| 旧版有尾注，新版没有尾注部件 | Use old 不可用（notesPart） |
+| 链接到外部文件的图片 | Use old 不可用（image） |
+| 页眉、文本框文字、链接地址、文档属性 Subject 改了 | Other parts 列出（决定 45） |
+
+## 18-comments 批注
+
+| 内容 | 期望结果 |
+|---|---|
+| 同一作者、同一批注、同一锚定文字 | Same |
+| 批注文字改了 | Comment text changed |
+| 锚定文字从 “at least 45 kg” 改为 “at least 50 kg” | Commented text changed；另有一处内容差异 |
+| 只在旧版 / 只在新版（新增段落上）的批注 | Only in old / Only in new；旧版批注在正文中显示为灰色 “Old comment”（决定 46） |
