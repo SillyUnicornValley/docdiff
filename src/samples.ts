@@ -1,4 +1,4 @@
-// Sample pairs on the select screen: the testdocs pairs 01–07, built into the
+// Sample pairs on the select screen: the testdocs pairs 01–18, built into the
 // page so a click compares real files with the real engine. Only
 // testdocs/docs/*.docx is included — never the "real examples" subfolder.
 // The hand-written mock pairs stay available for UI work with ?mock in the URL.
@@ -88,6 +88,21 @@ export const SAMPLE_PAIRS: SamplePair[] = [
     id: '15',
     title: '15 · Realistic SOP v1.0 → v2.0',
     description: 'A complete procedure document with history, TOC, definitions, steps, figure, footnote, landscape appendix.',
+  },
+  {
+    id: '16',
+    title: '16 · Formatting',
+    description: 'Formatting-only changes: bold, colour, font, alignment, spacing, list type, table style; style vs direct formatting.',
+  },
+  {
+    id: '17',
+    title: '17 · Notes, links and pictures',
+    description: 'Old paragraphs with footnotes, links, a picture, an equation and cross-references to bring back; header, text box, link address changes.',
+  },
+  {
+    id: '18',
+    title: '18 · Comments',
+    description: 'Comments in both files: the same, reworded, on changed text, only in the old file, only in the new file.',
   },
 ].flatMap((p) => {
   const base = Object.keys(FILES).find((k) => k.includes(`/${p.id}-`) && k.endsWith('_old.docx'));

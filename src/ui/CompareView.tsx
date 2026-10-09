@@ -16,6 +16,9 @@ import { CATEGORY_LABEL, KIND_LABEL, STATUS_LABEL } from './labels';
 import { BlockView, hasNewComment, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
 import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
 import { ScopePanel } from './ScopePanel';
+import { FormattingTab } from './FormattingTab';
+import type { Block } from '../model/document';
+import { forEachBlock } from '../model/docIndex';
 
 export interface ViewOptions {
   syncScroll: boolean;
@@ -25,6 +28,7 @@ export interface ViewOptions {
   compareToc: boolean;
   compareFields: boolean;
   showNumbering: boolean;
+  showFormatting: boolean;
   preview: 'off' | 'column' | 'only';
 }
 
@@ -36,6 +40,7 @@ export const defaultViewOptions = (): ViewOptions => ({
   compareToc: false,
   compareFields: false,
   showNumbering: true,
+  showFormatting: true,
   preview: 'off',
 });
 
@@ -84,7 +89,9 @@ export function CompareView({
   const [perChange, setPerChange] = useState<Set<DiffId>>(new Set());
   const [panel, setPanel] = useState<'scope' | null>(null);
   const [showExport, setShowExport] = useState(false);
-  const [tab, setTab] = useState<'content' | 'formatting'>('content');
+  const [tab, setTab] = useState<'content' | 'formatting' | 'other'>('content');
+  const [flashKey, setFlashKey] = useState<string | undefined>(undefined);
+  const pendingJump = useRef<string | undefined>(undefined);
   const loadRef = useRef<HTMLInputElement>(null);
 
   const ix = useMemo(() => makeIndexes(result), [result]);
@@ -93,12 +100,19 @@ export function CompareView({
   const levelList = structure.levels;
   const hints = useMemo(() => {
     const byId = (cs: typeof levelList) => new Map(cs.flatMap((c) => [[c.oldId, c] as const, [c.newId, c] as const]));
-    return { levels: byId(structure.levels), numbering: byId(structure.numbering) };
-  }, [structure]);
+    const formats = new Map((result.formatChanges ?? []).flatMap((c) => [[c.oldId, c] as const, [c.newId, c] as const]));
+    return { levels: byId(structure.levels), numbering: byId(structure.numbering), formats };
+  }, [structure, result]);
   const allRows = useMemo(() => withSectionRows(buildRows(result, ix), secMarkers), [result, ix, secMarkers]);
   const vis: Visibility = useMemo(
-    () => ({ hiddenCategories: opts.hiddenCategories, compareToc: opts.compareToc, compareFields: opts.compareFields, showNumbering: opts.showNumbering }),
-    [opts.hiddenCategories, opts.compareToc, opts.compareFields, opts.showNumbering],
+    () => ({
+      hiddenCategories: opts.hiddenCategories,
+      compareToc: opts.compareToc,
+      compareFields: opts.compareFields,
+      showNumbering: opts.showNumbering,
+      showFormatting: opts.showFormatting,
+    }),
+    [opts.hiddenCategories, opts.compareToc, opts.compareFields, opts.showNumbering, opts.showFormatting],
   );
   // Reviewable differences are numbered 1..N; info-only ones (TOC, fields) i1, i2…
   const numberOf = useMemo(() => {
@@ -278,7 +292,44 @@ export function CompareView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey]);
 
-  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers, hints };
+  // "Show in document" from the Formatting and Other parts tabs: the row holding a block (at any depth).
+  const rowKeyOfBlock = useMemo(() => {
+    const m = new Map<string, string>();
+    const add = (blocks: Block[], key: string) => forEachBlock(blocks, (b) => m.set(b.id, key));
+    for (const row of allRows) {
+      if (row.kind === 'equal') add([row.old, row.new], row.key);
+      else if (row.kind === 'diff') add([...row.old, ...row.new], row.key);
+      else if (row.kind === 'tableRow') {
+        if (row.first) m.set(row.oldTable.id, row.key), m.set(row.newTable.id, row.key);
+        for (const tr of [...row.old, ...row.new]) for (const c of tr.cells) add(c.blocks, row.key);
+      }
+    }
+    return m;
+  }, [allRows]);
+  const showBlock = (id: string) => {
+    const key = rowKeyOfBlock.get(id);
+    if (!key) return toast('This content is not shown in the comparison.', 'warn');
+    setTab('content');
+    setOpts((o) => (o.preview === 'only' ? { ...o, preview: 'off' } : o));
+    pendingJump.current = key;
+    setFlashKey(key);
+    if (!rows.some((r) => r.key === key)) setOpts((o) => ({ ...o, collapseUnchanged: false, diffsOnly: false }));
+  };
+  useEffect(() => {
+    const key = pendingJump.current;
+    if (!key || tab !== 'content') return;
+    const i = rows.findIndex((r) => r.key === key);
+    if (i < 0) return;
+    pendingJump.current = undefined;
+    requestAnimationFrame(() => scroller.current(i, 'center'));
+  });
+  useEffect(() => {
+    if (!flashKey) return;
+    const t = setTimeout(() => setFlashKey(undefined), 2400);
+    return () => clearTimeout(t);
+  }, [flashKey]);
+
+  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers, hints, flashKey };
   const actions: Actions = {
     choose,
     chooseHunk,
@@ -325,7 +376,7 @@ export function CompareView({
                 Content
               </button>
               <button role="tab" aria-selected={tab === 'formatting'} className={tab === 'formatting' ? 'active' : ''} onClick={() => setTab('formatting')}>
-                Formatting <span className="muted">· not checked</span>
+                Formatting <span className="muted">· {result.formatChanges ? result.formatChanges.length : 'not checked'}</span>
               </button>
             </div>
             <div className="spacer" />
@@ -409,6 +460,13 @@ export function CompareView({
                 </button>
               </Tip>
             )}
+            {(result.formatChanges?.length ?? 0) > 0 && (
+              <Tip tip="Paragraphs and tables formatted differently are marked Aa in the text. Shown only, not choosable: the export keeps the new file's formatting. Click to list them.">
+                <button className="link fmt" onClick={() => setTab('formatting')}>
+                  Aa {result.formatChanges!.length} formatting difference(s)
+                </button>
+              </Tip>
+            )}
             {mayDiffer > 0 && (
               <Tip tip="Parts that docdiff does not compare (such as headers, footers or images) look different in the two files. Check them in Word. Click to list them.">
                 <button className="link" onClick={() => setPanel('scope')}>
@@ -419,17 +477,7 @@ export function CompareView({
           </div>
 
           {tab === 'formatting' ? (
-            <div className="formatting-notice">
-              <h2>Formatting: not checked</h2>
-              <p>Formatting comparison (fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting) is not available in v1. Heading level changes are flagged in the text (⚑) but cannot be chosen.</p>
-              <p>
-                This does <b>not</b> mean the formatting is the same. The Content view shows both documents in one reading style; heading levels and list types are shown as they
-                are in each file but are not compared.
-              </p>
-              <button className="btn" onClick={() => setTab('content')}>
-                Back to content
-              </button>
-            </div>
+            <FormattingTab result={result} onShow={(c) => showBlock(c.newId)} onBack={() => setTab('content')} />
           ) : (
             <>
               <div className="toolbar">
@@ -643,6 +691,10 @@ function ViewMenu({
           <label>
             <input type="checkbox" checked={opts.compareFields} onChange={(e) => set('compareFields', e.target.checked)} /> Compare date, page and other fields
             {!hasInfo('fields') && <span className="muted"> (none in this pair)</span>}
+          </label>
+          <label>
+            <input type="checkbox" checked={opts.showFormatting} onChange={(e) => set('showFormatting', e.target.checked)} /> Mark formatting changes (Aa)
+            <span className="muted"> ({result.formatChanges?.length ?? 0})</span>
           </label>
           <label>
             <input type="checkbox" checked={opts.showNumbering} onChange={(e) => set('showNumbering', e.target.checked)} /> Mark automatic numbering changes
@@ -950,7 +1002,7 @@ function AlignedRowView({ row, showFinal }: { row: Row; showFinal: boolean }) {
   const select = ids.length === 1 ? () => ctx.onSelectDiff?.(ids[0]) : undefined;
   const fin = showFinal ? finalRowContent(row, ctx) : null;
   return (
-    <div className={`row${ids.length ? ' row-chg' : ''}${isCurrent ? ' row-current' : ''}${showFinal ? ' with-final' : ''}`} onClick={select}>
+    <div className={`row${ids.length ? ' row-chg' : ''}${isCurrent ? ' row-current' : ''}${showFinal ? ' with-final' : ''}${ctx.flashKey === row.key ? ' row-flash' : ''}`} onClick={select}>
       <div className={`cell old ${o.cls}`}>{o.node}</div>
       <div className="gutter">
         {ids.map((id) => (

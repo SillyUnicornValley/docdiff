@@ -134,6 +134,8 @@ export interface Visibility {
   compareFields: boolean;
   /** Mark automatic numbering changes (decision 38). */
   showNumbering: boolean;
+  /** Mark formatting changes with "Aa" (decision 44). */
+  showFormatting: boolean;
 }
 
 /** Is this difference hidden from view and navigation (category filter / optional comparison off)? */
