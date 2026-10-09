@@ -43,6 +43,12 @@
 | 30 | 10-08 | 自检不一致时 | 先不下载，列出不一致之处，由用户选择 “Download anyway” 或取消 | [export §4](spec/export.md) |
 | 31 | 10-08 | 导出界面 | 沿用原型的导出对话框；Tracked changes 仍为以后的版本；`?mock` 下导出仍是模拟 | [export §5](spec/export.md) |
 | 32 | 10-08 | 引擎调整（engine-4） | ① 短段落文字在两份文件中都只出现一次时也可认作移动；② 表格行第一格相同（且含字母）时配成同一行 | [comparison §2.2](spec/comparison.md) G9、G10 |
+| 33 | 10-08 | 是否读取 .doc（Word 97–2003） | 不读取；提示用户在 Word 中另存为 .docx 后上传 | [reading §1](spec/reading.md)、[scope §2](spec/scope.md) |
+| 34 | 10-09 | 修订类型的“不支持”怎么定 | 全部接受；只有单元格修订提示“结果可能不准确”，表格属性、分节设置修订改为支持 | [reading §4](spec/reading.md) |
+| 35 | 10-09 | 段落作为选择单位是否太大 | 维持段落，一段内多处修改整段取舍；段内展开以后再考虑 | [comparison §2.2](spec/comparison.md) G6 |
+| 36 | 10-09 | 差异切分规则 G1–G5、G7–G12 | 试用示例 01、02、03、06、10、12、13 后按现行做法全部确认 | [comparison §2.2](spec/comparison.md) |
+| 37 | 10-09 | 标题级别变化、移动时改了文字，要不要提示 | 都要醒目提示：标题级别变化只提示、不能选择；移动且改了文字时卡片标注 “Moved and text changed” | [comparison §1、§3](spec/comparison.md)、[ui §3](spec/ui.md) |
+| 38 | 10-09 | 自动编号不同要不要显示 | 显示：编号旁标 “№ 旧 → 新”，默认开、可在 View 关闭；只提示，不能选择 | [comparison §6](spec/comparison.md)、[ui §3](spec/ui.md) |
 
 ## 2. 界面决定 A1–A12（原型阶段，2026-10-07）
 
@@ -63,4 +69,4 @@
 
 ## 3. 待决定
 
-- 差异颗粒度 G1–G12：见 [comparison §2.2](spec/comparison.md)。
+（暂无）

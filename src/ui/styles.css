@@ -1693,3 +1693,66 @@ table.from-old-row td {
     padding-inline: 16px;
   }
 }
+
+/* heading level changes (decision 37): shown only, not choosable */
+.level-mark {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #f3e8ff;
+  border: 1px solid #8250df;
+  color: #6639ba;
+  font: 600 11px/1.6 var(--ui-font);
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.link.level {
+  color: #6639ba;
+}
+.pill-flagged {
+  color: #6639ba;
+  background: #f3e8ff;
+}
+.level-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+/* moved and text changed (decision 37): made obvious so it is not read as "same text, new place" */
+.g-moved-changed {
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--warn-bg);
+  border: 1px solid #d4a72c;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+}
+.g-moved-changed-dot {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* automatic numbering changes (decision 38): shown only, not choosable */
+.num-label.num-changed {
+  color: #0a6c74;
+  font-weight: 700;
+}
+.num-mark {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #e0f5f5;
+  border: 1px solid #1b9aaa;
+  color: #0a6c74;
+  font: 600 10.5px/1.5 var(--ui-font);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.link.numbering {
+  color: #0a6c74;
+}

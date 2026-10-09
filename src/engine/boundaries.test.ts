@@ -41,14 +41,13 @@ describe('Use old boundaries', () => {
   });
 });
 
-describe('unsupported revision types (spec/reading)', () => {
-  it('are accepted, reported with type and location, and the comparison continues', async () => {
+describe('table cell and property revisions (spec/reading §4, decision 34)', () => {
+  it('accepts both; reports only the cell revision, with type and location', async () => {
     const cellIns = `<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc><w:tcPr><w:cellIns w:id="1" w:author="A"/></w:tcPr>${p('Added cell')}</w:tc></w:tr></w:tbl>`;
     const sectChange = `<w:p><w:pPr><w:sectPr><w:sectPrChange w:id="2" w:author="A"><w:sectPr/></w:sectPrChange></w:sectPr></w:pPr><w:r><w:t>End of part one.</w:t></w:r></w:p>`;
     const r = await compare(p('Intro.'), p('Intro.') + cellIns + sectChange);
     expect(r.scope.unsupportedRevisions).toEqual([
       { side: 'new', type: 'Inserted table cell', location: 'Table' },
-      { side: 'new', type: 'Section and page setup change', location: 'Paragraph "End of part one."' },
     ]);
     expect(r.order.length).toBeGreaterThan(0);
     expect(r.scope.pendingRevisionsInNew).toBe(2);

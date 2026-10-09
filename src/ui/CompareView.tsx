@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { DiffId, DiffResult, Difference, NormCategory } from '../model/diff';
+import { structureHints } from '../model/hints';
 import type { Choice, ReviewStatus } from '../model/review';
 import { applyChoices, makeProgressFile, parseProgressFile, redo, statusOf, undo, type Review } from '../model/reviewOps';
 import type { ExportResult } from '../engine';
@@ -20,6 +21,7 @@ export interface ViewOptions {
   hiddenCategories: Set<NormCategory>;
   compareToc: boolean;
   compareFields: boolean;
+  showNumbering: boolean;
   preview: 'off' | 'column' | 'only';
 }
 
@@ -30,6 +32,7 @@ export const defaultViewOptions = (): ViewOptions => ({
   hiddenCategories: new Set(),
   compareToc: false,
   compareFields: false,
+  showNumbering: true,
   preview: 'off',
 });
 
@@ -78,10 +81,16 @@ export function CompareView({
 
   const ix = useMemo(() => makeIndexes(result), [result]);
   const secMarkers = useMemo(() => sectionMarkers(result), [result]);
+  const structure = useMemo(() => structureHints(result), [result]);
+  const levelList = structure.levels;
+  const hints = useMemo(() => {
+    const byId = (cs: typeof levelList) => new Map(cs.flatMap((c) => [[c.oldId, c] as const, [c.newId, c] as const]));
+    return { levels: byId(structure.levels), numbering: byId(structure.numbering) };
+  }, [structure]);
   const allRows = useMemo(() => withSectionRows(buildRows(result, ix), secMarkers), [result, ix, secMarkers]);
   const vis: Visibility = useMemo(
-    () => ({ hiddenCategories: opts.hiddenCategories, compareToc: opts.compareToc, compareFields: opts.compareFields }),
-    [opts.hiddenCategories, opts.compareToc, opts.compareFields],
+    () => ({ hiddenCategories: opts.hiddenCategories, compareToc: opts.compareToc, compareFields: opts.compareFields, showNumbering: opts.showNumbering }),
+    [opts.hiddenCategories, opts.compareToc, opts.compareFields, opts.showNumbering],
   );
   // Reviewable differences are numbered 1..N; info-only ones (TOC, fields) i1, i2…
   const numberOf = useMemo(() => {
@@ -249,7 +258,7 @@ export function CompareView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey]);
 
-  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers };
+  const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers, hints };
   const actions: Actions = {
     choose,
     select: setCurrentId,
@@ -337,7 +346,7 @@ export function CompareView({
             />
             <button className={`btn${panel === 'scope' ? ' active' : ''}`} onClick={() => setPanel(panel === 'scope' ? null : 'scope')} title="What was compared and what was not">
               Check scope
-              {unsupported + mayDiffer > 0 && <span className="badge warn">{unsupported + mayDiffer}</span>}
+              {unsupported + mayDiffer + levelList.length > 0 && <span className="badge warn">{unsupported + mayDiffer + levelList.length}</span>}
             </button>
             <button className="btn btn-primary" onClick={() => setShowExport(true)}>
               Export…
@@ -348,7 +357,17 @@ export function CompareView({
             <span>ⓘ Compared as if all existing tracked changes were accepted. Original files are not modified.</span>
             {unsupported > 0 && (
               <button className="link warn" onClick={() => setPanel('scope')}>
-                ⚠ {unsupported} unsupported revision type(s) — results nearby may be inaccurate
+                ⚠ {unsupported} table cell tracked change(s) — results in those tables may be inaccurate
+              </button>
+            )}
+            {levelList.length > 0 && (
+              <button className="link level" onClick={() => setPanel('scope')}>
+                ⚑ {levelList.length} heading level change(s) — flagged in the text, not choosable
+              </button>
+            )}
+            {structure.numbering.length > 0 && (
+              <button className="link numbering" onClick={() => setPanel('scope')}>
+                № {structure.numbering.length} automatic numbering change(s){opts.showNumbering ? ' — marked in the text, not choosable' : ' — marks hidden (View)'}
               </button>
             )}
             {mayDiffer > 0 && (
@@ -361,7 +380,7 @@ export function CompareView({
           {tab === 'formatting' ? (
             <div className="formatting-notice">
               <h2>Formatting: not checked</h2>
-              <p>Formatting comparison (fonts, sizes, colours, bold/italic, spacing, styles, heading levels, list types, table formatting) is not available in v1.</p>
+              <p>Formatting comparison (fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting) is not available in v1. Heading level changes are flagged in the text (⚑) but cannot be chosen.</p>
               <p>
                 This does <b>not</b> mean the formatting is the same. The Content view shows both documents in one reading style; heading levels and list types are shown as they
                 are in each file but are not compared.
@@ -417,7 +436,7 @@ export function CompareView({
                 <button className="btn" onClick={doRedo} disabled={!review.history.future.length} title={review.history.future.length ? `Redo: ${review.history.future[0].label} (Ctrl+Shift+Z)` : 'Nothing to redo'}>
                   ↷ Redo
                 </button>
-                <ViewMenu opts={opts} set={set} result={result} />
+                <ViewMenu opts={opts} set={set} result={result} numberingCount={structure.numbering.length} />
                 <div className="seg" role="group" aria-label="Final result preview">
                   <span className="seg-label">Final result:</span>
                   {(['off', 'column', 'only'] as const).map((p) => (
@@ -443,7 +462,7 @@ export function CompareView({
             </>
           )}
 
-          {panel === 'scope' && <ScopePanel result={result} onClose={() => setPanel(null)} />}
+          {panel === 'scope' && <ScopePanel result={result} hints={structure} onClose={() => setPanel(null)} />}
           {showExport && (
             <ExportDialog
               result={result}
@@ -524,7 +543,17 @@ function BatchMenu({
 // View options menu
 // ---------------------------------------------------------------------------
 
-function ViewMenu({ opts, set, result }: { opts: ViewOptions; set: <K extends keyof ViewOptions>(k: K, v: ViewOptions[K]) => void; result: DiffResult }) {
+function ViewMenu({
+  opts,
+  set,
+  result,
+  numberingCount,
+}: {
+  opts: ViewOptions;
+  set: <K extends keyof ViewOptions>(k: K, v: ViewOptions[K]) => void;
+  result: DiffResult;
+  numberingCount: number;
+}) {
   const counts = useMemo(() => {
     const c = new Map<NormCategory, number>();
     for (const d of Object.values(result.differences)) {
@@ -574,8 +603,9 @@ function ViewMenu({ opts, set, result }: { opts: ViewOptions; set: <K extends ke
             <input type="checkbox" checked={opts.compareFields} onChange={(e) => set('compareFields', e.target.checked)} /> Compare date, page and other fields
             {!hasInfo('fields') && <span className="muted"> (none in this pair)</span>}
           </label>
-          <label className="disabled" title="Planned for a later version">
-            <input type="checkbox" disabled /> Compare automatic numbering <span className="muted">— not available in v1</span>
+          <label title="Marks paragraphs whose automatic number differs (e.g. 3. → 4. after an inserted item). Shown only; the export keeps the new numbering.">
+            <input type="checkbox" checked={opts.showNumbering} onChange={(e) => set('showNumbering', e.target.checked)} /> Mark automatic numbering changes
+            <span className="muted"> ({numberingCount})</span>
           </label>
         </div>
       )}
@@ -587,6 +617,9 @@ function ViewMenu({ opts, set, result }: { opts: ViewOptions; set: <K extends ke
 // Difference controls (gutter)
 // ---------------------------------------------------------------------------
 
+/** A move whose text was also edited (decision 37): flagged so it is not read as "same text, new place". */
+const movedAndChanged = (d: Difference) => d.kind === 'moved' && d.wordHunks.length > 0;
+
 function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'from' | 'to'; compact?: boolean }) {
   const { choices, currentId, ix } = useView();
   const a = useContext(ActionsContext);
@@ -596,7 +629,7 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
     return (
       <div
         className={`gctl compact status-${status}${currentId === d.id ? ' current' : ''}`}
-        title={`#${a.number(d.id)} ${k.label} · ${status === 'info' ? 'info only' : STATUS_LABEL[status]}`}
+        title={`#${a.number(d.id)} ${k.label}${movedAndChanged(d) ? ' and text changed' : ''} · ${status === 'info' ? 'info only' : STATUS_LABEL[status]}`}
         onClick={(e) => {
           e.stopPropagation();
           a.select(d.id);
@@ -606,6 +639,11 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
         <span className={`g-icon kind-${d.kind}`} aria-label={k.label}>
           {k.icon}
         </span>
+        {movedAndChanged(d) && (
+          <span className="g-moved-changed-dot" title="Moved and text changed">
+            ✎
+          </span>
+        )}
         {status === 'info' ? (
           <span className="g-info">info</span>
         ) : (
@@ -715,6 +753,11 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
           {part === 'from' ? 'Original location · go to new ↓' : 'New location · go to original ↑'}
         </button>
       )}
+      {movedAndChanged(d) && (
+        <div className="g-moved-changed" title="The text was also edited when it was moved. The changes are highlighted in both places.">
+          ✎ Moved and text changed
+        </div>
+      )}
       {!compact && hasNewComment(d, ix) && (
         <div className="g-note g-comment" title="Comments in the new file are kept on export. If you use old here or remove this text, check in Word where the comment ends up.">
           Has a new-file comment
@@ -746,7 +789,11 @@ function sideContent(row: Row, side: 'old' | 'new', ctx: ViewCtx): { node: React
     }
     if (!blocks.length) {
       const label =
-        d.kind === 'moved' ? (side === 'old' ? '⇄ new location of moved text' : '⇄ original location of moved text') : side === 'old' ? 'not in old' : 'not in new';
+        d.kind === 'moved'
+          ? `${side === 'old' ? '⇄ new location of moved text' : '⇄ original location of moved text'}${movedAndChanged(d) ? ' · text also changed' : ''}`
+          : side === 'old'
+            ? 'not in old'
+            : 'not in new';
       return { node: <Spacer label={label} />, cls: `spacer ${sideClass(d, side, ctx)}` };
     }
     const hl = highlightsFor(d, side, ctx.vis);

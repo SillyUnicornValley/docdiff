@@ -17,7 +17,7 @@ const MOCK_MODE = new URLSearchParams(location.search).has('mock');
 export function validateFile(name: string): string | undefined {
   const ext = name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] ?? '';
   if (ext === '.docx') return undefined;
-  if (ext === '.doc') return 'Word 97–2003 (.doc) files are not supported. Open the file in Word and save it as .docx first.';
+  if (ext === '.doc') return 'Word 97–2003 (.doc) files are not supported. Open the file in Word, choose File › Save As › Word Document (*.docx), then select the saved .docx here.';
   if (['.docm', '.dotx', '.dotm'].includes(ext)) return `${ext} files are not supported. Save the file as a standard .docx in Word first.`;
   return 'This is not a Word .docx file.';
 }

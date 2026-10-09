@@ -132,6 +132,8 @@ export interface Visibility {
   hiddenCategories: Set<NormCategory>;
   compareToc: boolean;
   compareFields: boolean;
+  /** Mark automatic numbering changes (decision 38). */
+  showNumbering: boolean;
 }
 
 /** Is this difference hidden from view and navigation (category filter / optional comparison off)? */

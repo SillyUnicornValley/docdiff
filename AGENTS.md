@@ -13,7 +13,7 @@ A browser-only tool for comparing and merging two Word (.docx) files. It targets
 
 - **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). UI decisions A1–A12 are in `docs/decisions.md` §2.
 - **Stage 2 (done, v0.2.0):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/implementation/stage2-design.md`. Milestones M1–M6 are done; sample pairs are the built-in testdocs (`src/samples.ts`), and the hand-written mocks appear with `?mock`.
-- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Not done yet: Track Changes export; difference granularity (`docs/spec/comparison.md` §2.2) is still to be discussed with the user.
+- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Not done yet: Track Changes export. Difference granularity rules G1–G12 (`docs/spec/comparison.md` §2.2) were confirmed by the user (decisions 35–36).
 
 ## Commands
 
@@ -42,7 +42,7 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 Start at `docs/overview.md` (goal, design principles, stage status, acceptance criteria, to-do list, doc index).
 
 - `docs/spec/`: current rules by topic — `scope.md` (goal, scope, deployment, acceptance criteria), `reading.md` (supported files, existing revisions and revision types), `comparison.md` (what counts as a difference, granularity G1–G12, moves, tables, not-compared elements, per-element support status), `merge.md` (merge model, review states, when "Use old" is unavailable), `export.md` (export rules, structure protection, self-check), `ui.md` (UI and review progress)
-- `docs/decisions.md`: decision log — numbered decisions 1–32 and UI decisions A1–A12; code comments cite "decision N"
+- `docs/decisions.md`: decision log — numbered decisions and UI decisions A1–A12; code comments cite "decision N"
 - `docs/implementation/stage2-design.md`: Stage 2 technical design and milestones (technical choices are the developer's call; only user-visible behavior goes to the user)
 - `docs/implementation/stage3-design.md`: Stage 3 export implementation, self-check, and how exported files are XSD-validated
 - `docs/archive/`: unmaintained snapshots (design review v0.1, prototype notes) and the map from old "spec §x.y" numbers to the new files

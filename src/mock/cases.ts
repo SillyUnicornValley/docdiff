@@ -227,7 +227,7 @@ export function case05(): DiffResult {
     pendingRevisionsInNew: 0,
     newRevisions: {
       accepted: [],
-      unsupported: [{ type: 'Section and page setup change', location: 'Paragraph "End of main protocol."' }],
+      unsupported: [{ type: 'Merged table cell', location: 'Table' }],
     },
     extraScope: [
       { element: 'Footnote text', status: 'detectedOnly', oldCount: 1, newCount: 2 },

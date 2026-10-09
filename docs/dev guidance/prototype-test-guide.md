@@ -42,7 +42,7 @@ npm run dev
 |---|---|---|
 | 1.1 | 打开页面 | 左上角显示 `docdiff v0.1.0 · prototype · built 日期` |
 | 1.2 | 在 Old、New 两个区域分别选择 `testdocs/docs/01-basic-text_old.docx`、`01-basic-text_new.docx`（也可拖放） | 两个区域显示文件名和大小，变为红色和绿色 |
-| 1.3 | 选择一个 `.doc` 文件（任意改名的文件即可） | 红框，提示 “Word 97–2003 (.doc) files are not supported…”；Compare 按钮不可用 |
+| 1.3 | 选择一个 `.doc` 文件（任意改名的文件即可） | 红框，提示 “Word 97–2003 (.doc) files are not supported. Open the file in Word, choose File › Save As…”；Compare 按钮不可用 |
 | 1.4 | 点中间的 ⇄ Swap | 左右文件互换 |
 | 1.5 | 阅读蓝色说明框 | 写明“按接受全部已有修订后的状态比较，原文件不变”，以及新版未决修订在导出时会被接受 |
 | 1.6 | 点 Compare，或点下方任一 Sample pair | 出现 “Comparing…” 进度窗，依次显示四个步骤，然后进入比较页 |
@@ -60,7 +60,7 @@ npm run dev
 | 01.3 | 新增段 “Randomization…” | 左侧为斜纹空白，写 “not in old”；其后的相同段落仍左右对齐 |
 | 01.4 | 删除段 “An interim analysis…” | 单独一个差异 #6（Deleted），右侧为斜纹空白 |
 | 01.5 | “24 hours” 加粗变红那段，以及 run 拆分那段 | **无**差异标记 |
-| 01.6 | “Safety Monitoring” | 左边是二级标题，右边是三级标题，各按自己的层级显示，**不**算差异 |
+| 01.6 | “Safety Monitoring” | 左边是二级标题，右边是三级标题，各按自己的层级显示，**不**算差异；两侧标题旁有紫色标记 “⚑ Heading 2 → Heading 3”，顶部说明栏有 “⚑ 1 heading level change(s)”（决定 37） |
 | 01.7 | 在差异 #1 点 **Use old** | 卡片显示 “✓ Using old”；右侧淡化并标 “NOT USED”；左侧标 “✓ USED”；顶部进度变为 “Reviewed 1 / 6” |
 | 01.8 | 点 Undo，再点 Redo | 选择被撤销、恢复；按钮悬停时显示要撤销的是哪一步 |
 
@@ -68,13 +68,13 @@ npm run dev
 
 | # | 检查 | 应该看到 |
 |---|---|---|
-| 02.1 | 纳入标准中新增第 2 条 | 只有这一条标为 Inserted；后面条目的编号从 2、3、4 变成 3、4、5，但**不**标为修改 |
+| 02.1 | 纳入标准中新增第 2 条 | 只有这一条标为 Inserted；后面条目的编号从 2、3、4 变成 3、4、5，但**不**标为修改；这些条目的编号旁有 “№ 2. → 3.” 等标记，顶部说明栏显示 “№ 11 automatic numbering change(s)”；在 View 中取消 “Mark automatic numbering changes” 后标记消失（决定 38） |
 | 02.2 | `40`→`35` | 只高亮数字 |
 | 02.3 | “Known hypersensitivity…” | 显示为 **Moved**（蓝色、⇄）：新位置在列表开头，原位置在列表末尾 |
 | 02.4 | 在移动差异上点 “go to original ↑” 或 “go to new ↓” | 跳到另一处 |
 | 02.5 | 在一处点 Use old | 两处同时显示 “Using old”（一个差异，一次选择） |
 | 02.6 | 二级条目 `effective`→`highly effective` | 保持缩进和 `a)` 编号，只高亮 “highly” |
-| 02.7 | 禁用药物列表 | 左边是项目符号，右边是数字编号，这三条**不**算差异；只报新增的 “St. John's Wort” 和新增章节 |
+| 02.7 | 禁用药物列表 | 左边是项目符号，右边是数字编号，这三条**不**算差异，编号旁标 “№ • → 1.” 等；只报新增的 “St. John's Wort” 和新增章节 |
 | 02.8 | Study Procedures | 手打的 `1) ` 消失，显示为修改；右侧自动编号为 6、7、8（新版故意续接列表 1） |
 
 ### 3.3 样例 03 · Tables
@@ -92,7 +92,7 @@ npm run dev
 
 | # | 检查 | 应该看到 |
 |---|---|---|
-| 05.1 | 顶部说明栏 | 写有已有修订的说明；有 “⚠ 1 unsupported revision type(s)” 和 “6 not-compared part(s) may differ” 两个链接 |
+| 05.1 | 顶部说明栏 | 写有已有修订的说明；有 “⚠ 1 table cell tracked change(s)” 和 “6 not-compared part(s) may differ” 两个链接 |
 | 05.1b | Treatment 一节 | 新版中 `24 weeks` 前、titration 段开头、新增段 “Missed doses…” 开头各有一个黄色 “Comment · Bob” 标记；titration 段**不**算差异；#1 和 #2 的卡片注明 “Has a new-file comment” |
 | 05.2 | Version date | 日期显示为灰底域，带 “FIELD” 小标；默认**不**算差异 |
 | 05.3 | 目录 | 折叠显示 “Table of contents · 3 / 4 entries · not compared”，可点开查看 |
@@ -105,7 +105,7 @@ npm run dev
 | 05.10 | 新增附录 | “End of main protocol.” 段下方标有 “Section break” |
 | 05.11 | 文档开头 | 左右各有一条 “§ Section 1 · Header · may differ · Footer · same” 标记 |
 | 05.12 | 新增附录前的 “Section break” 处 | 右侧标 “§ Section 2 · Header · section not in old · Footer · section not in old” |
-| 05.13 | 点 **Check scope** | 右侧面板依次列出：不支持的修订（Section and page setup change）；Formatting: Not checked；“Headers and footers by section” 表格（第 1 节页眉 May differ、页脚 Same，第 2 节 Section only in new）；脚注、图片、超链接地址 “May differ”；文档属性 “Same”；各类元素的两版数量 |
+| 05.13 | 点 **Check scope** | 右侧面板依次列出：单元格修订（Merged table cell）；Formatting: Not checked，以及 Heading levels: Flagged only；“Headers and footers by section” 表格（第 1 节页眉 May differ、页脚 Same，第 2 节 Section only in new）；脚注、图片、超链接地址 “May differ”；文档属性 “Same”；各类元素的两版数量 |
 
 ### 3.5 样例 06 · Alignment edge cases
 

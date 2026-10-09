@@ -6,18 +6,25 @@ import { isW, NS, plainText, remove, unwrap, wAll, wChild } from './xml';
 export interface AcceptedRevisions {
   /** Revisions accepted, by readable type. */
   accepted: Map<string, number>;
-  /** Revision types docdiff does not fully support (spec/reading): accepted anyway, reported with a location. */
+  /** Revisions that may make nearby results inaccurate (spec/reading §4, decision 34): accepted anyway, reported with a location. */
   unsupported: { type: string; location: string }[];
 }
 
 /** Property-change records: accepting means keeping the current properties. */
 const FORMAT_CHANGES = ['rPrChange', 'pPrChange'];
 
-/** spec/reading §4 "Not supported": still accepted the same way, but reported. */
-const UNSUPPORTED: Record<string, string> = {
+/**
+ * Cell revisions (spec/reading §4, decision 34): accepted, but the table's
+ * column structure may not line up afterwards, so they are reported.
+ */
+const CELL_CHANGES: Record<string, string> = {
   cellIns: 'Inserted table cell',
   cellDel: 'Deleted table cell',
   cellMerge: 'Merged table cell',
+};
+
+/** Other property-change records: accepting keeps the current properties; not reported (decision 34). */
+const PROPERTY_CHANGES: Record<string, string> = {
   tblPrChange: 'Table property change',
   tblPrExChange: 'Table property change',
   trPrChange: 'Table property change',
@@ -69,8 +76,8 @@ export function acceptAllRevisions(root: Element): AcceptedRevisions {
   const unsupported: AcceptedRevisions['unsupported'] = [];
   const count = (type: string, n = 1) => n && accepted.set(type, (accepted.get(type) ?? 0) + n);
 
-  // 1. Unsupported types: report with a location first (before content moves), then accept.
-  for (const [local, type] of Object.entries(UNSUPPORTED)) {
+  // 1. Cell revisions: report with a location first (before content moves), then accept.
+  for (const [local, type] of Object.entries(CELL_CHANGES)) {
     for (const el of wAll(root, local)) {
       unsupported.push({ type, location: locationOf(el) });
       if (local === 'cellDel') {
@@ -135,6 +142,12 @@ export function acceptAllRevisions(root: Element): AcceptedRevisions {
   for (const local of FORMAT_CHANGES) {
     const els = wAll(root, local);
     count('Formatting change', els.length);
+    for (const el of els) remove(el);
+  }
+
+  for (const [local, type] of Object.entries(PROPERTY_CHANGES)) {
+    const els = wAll(root, local);
+    count(type, els.length);
     for (const el of els) remove(el);
   }
 

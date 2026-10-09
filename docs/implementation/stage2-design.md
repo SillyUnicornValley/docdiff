@@ -172,7 +172,7 @@ Stage 2 只做“解析 + 比较”，输出原型已在使用的 `DiffResult`�
 - **“采用旧版”的边界检查**：
   - 读取时记下跨越多个段落的域和内容控件，以及包住多行的内容控件；
   - 一处差异只覆盖其中一部分时，“采用旧版”不可用，提示原因是 `fieldBoundary` 或 `contentControlBoundary`（spec/export §2）。
-- **不支持的修订类型**：记录类型和位置，列入检查范围，比较照常进行（spec/reading）。
+- **单元格修订**：记录类型和位置，列入检查范围，比较照常进行（spec/reading §4，决定 34；原为“不支持的修订类型”，决定 34 后只剩单元格修订会提示）。
 - **测试**：`src/engine/boundaries.test.ts` 用 `src/engine/testing/makeDocx.ts` 临时生成小文档，覆盖测试文档里没有的情况。
 
 ### M5 完成情况（2026-10-07）

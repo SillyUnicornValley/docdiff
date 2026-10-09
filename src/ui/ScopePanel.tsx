@@ -1,9 +1,26 @@
 import type { DiffResult, ScopeStatus } from '../model/diff';
+import type { StructureChange, StructureHints } from '../model/hints';
 import { SCOPE_STATUS_LABEL } from './labels';
 
 const ORDER: ScopeStatus[] = ['compared', 'detectedOnly', 'shownNotCompared', 'notSupported'];
 
-export function ScopePanel({ result, onClose }: { result: DiffResult; onClose: () => void }) {
+const SHOWN = 50;
+
+function ChangeList({ items, mark }: { items: StructureChange[]; mark: string }) {
+  if (!items.length) return null;
+  return (
+    <ul className="level-list">
+      {items.slice(0, SHOWN).map((c) => (
+        <li key={c.newId}>
+          {mark} <b>{c.oldLabel} → {c.newLabel}</b> — “{c.text.length > 60 ? `${c.text.slice(0, 60)}…` : c.text || '(empty)'}”
+        </li>
+      ))}
+      {items.length > SHOWN && <li className="muted">… and {items.length - SHOWN} more</li>}
+    </ul>
+  );
+}
+
+export function ScopePanel({ result, hints, onClose }: { result: DiffResult; hints: StructureHints; onClose: () => void }) {
   const s = result.scope;
   return (
     <aside className="drawer" aria-label="Check scope">
@@ -18,11 +35,11 @@ export function ScopePanel({ result, onClose }: { result: DiffResult; onClose: (
 
         {s.unsupportedRevisions.length > 0 && (
           <section className="scope-sec warn-box">
-            <h3>⚠ Unsupported tracked changes</h3>
+            <h3>⚠ Table cell tracked changes</h3>
             <ul>
               {s.unsupportedRevisions.map((u, i) => (
                 <li key={i}>
-                  <b>{u.type}</b> in the {u.side} file — {u.location}. Comparison continued; results near this location may be inaccurate.
+                  <b>{u.type}</b> in the {u.side} file — {u.location}. Accepted and compared; the table's columns may not line up, so results in this table may be inaccurate.
                 </li>
               ))}
             </ul>
@@ -32,8 +49,16 @@ export function ScopePanel({ result, onClose }: { result: DiffResult; onClose: (
         <section className="scope-sec">
           <h3>Formatting</h3>
           <div className="scope-row">
-            <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, heading levels, list types, table formatting.
+            <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting.
           </div>
+          <div className="scope-row">
+            <span className="pill pill-flagged">Flagged only</span> Heading levels: changes are marked ⚑ in the text but cannot be chosen; the export keeps the new file's level.
+          </div>
+          <ChangeList items={hints.levels} mark="⚑" />
+          <div className="scope-row">
+            <span className="pill pill-flagged">Flagged only</span> Automatic numbering: numbers that differ are marked № in the text (an inserted item shifts all later numbers). Not choosable; Word recalculates numbers and the export keeps the new numbering.
+          </div>
+          <ChangeList items={hints.numbering} mark="№" />
         </section>
 
         {s.sectionHints.length > 0 && (

@@ -5,6 +5,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Block, CommentInline, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, TableBlock, TableCell, TableRow } from '../model/document';
 import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
+import type { StructureChange } from '../model/hints';
 import type { Choice } from '../model/review';
 import { isHidden, type Indexes, type SectionMarker, type SectionMarkers, type Visibility } from './rows';
 
@@ -20,6 +21,8 @@ export interface ViewCtx {
   currentId?: string;
   onSelectDiff?: (id: string) => void;
   sections: SectionMarkers;
+  /** Heading level and numbering changes by old and new paragraph id (decisions 37–38). */
+  hints: { levels: Map<string, StructureChange>; numbering: Map<string, StructureChange> };
 }
 
 export const ViewContext = createContext<ViewCtx>(null as unknown as ViewCtx);
@@ -161,7 +164,9 @@ function placeholderFingerprints(p?: ParagraphBlock) {
 }
 
 export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]; counterpart?: ParagraphBlock }) {
-  const { vis, sections } = useView();
+  const { vis, sections, hints } = useView();
+  const level = hints.levels.get(p.id);
+  const num = vis.showNumbering ? hints.numbering.get(p.id) : undefined;
   const { pieces, text } = flattenParagraph(p);
   const other = placeholderFingerprints(counterpart);
   let phIndex = 0;
@@ -223,11 +228,27 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
       data-level={role.type === 'heading' ? role.level : undefined}
     >
       {p.numbering && (
-        <span className="num-label" title="Automatic numbering — shown, not compared in v1">
+        <span className={`num-label${num ? ' num-changed' : ''}`} title="Automatic numbering — shown, not choosable">
           {p.numbering.label}
         </span>
       )}
+      {num && (
+        <span
+          className="num-mark"
+          title="Automatic numbering differs between the two files. Shown only, not choosable: Word recalculates numbers, and the export keeps the new file's numbering. Hide these marks in View."
+        >
+          № {num.oldLabel} → {num.newLabel}
+        </span>
+      )}
       {empty ? <span className="empty-mark" title="Empty paragraph">¶ empty paragraph</span> : out}
+      {level && (
+        <span
+          className="level-mark"
+          title="Heading level changed. Shown only, not choosable: the export keeps the new file's level. Change it in Word after export if needed."
+        >
+          ⚑ {level.oldLabel} → {level.newLabel}
+        </span>
+      )}
       {p.sectionBreak && (
         <span className="section-break" title="This paragraph carries a section break. If it is removed, the break moves to the neighbouring paragraph.">
           ⸺ Section break ⸺

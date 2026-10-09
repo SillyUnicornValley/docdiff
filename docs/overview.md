@@ -24,7 +24,7 @@
 | 原则 | 含义 | 出处 |
 |---|---|---|
 | 先接受已有修订 | 上传的文件如果带 Track Changes，先按「全部接受」处理，再比较 | [reading](spec/reading.md)，决定 22 |
-| 只比内容，不比格式 | 字体、加粗、run 拆分不同不算差异；上下标、隐藏文字算内容 | [comparison §1](spec/comparison.md) |
+| 只比内容，不比格式 | 字体、加粗、run 拆分（Word 内部的文字切法，见 comparison §1）不同不算差异；上下标、隐藏文字算内容 | [comparison §1](spec/comparison.md) |
 | 默认结果 = 新版 | 没有选择的差异按新版处理；全部采用新版时，导出等于接受修订后的新版 | [merge §1](spec/merge.md) |
 | 以新版为底稿 | 导出时在新版文件上修改，只改用户选了旧版的地方，其余保持原样 | [export](spec/export.md) |
 | 不确定就不做 | 含脚注、图片、超链接、域、跨段内容控件等的差异，不提供「采用旧版」 | [merge §3](spec/merge.md)，决定 15 |
@@ -32,7 +32,7 @@
 | 导出必须自检 | 导出后重新读取文件，与「最终结果」预览逐块核对 | [export §4](spec/export.md)，决定 30 |
 | 进度可恢复 | 差异编号按内容生成，同样两份文件再比较，编号不变，进度文件可以恢复 | [ui §4](spec/ui.md) |
 
-每条原则的完整规则在 [spec/](spec/) 下对应的主题文档里；所有决定（第 1–32 条、界面决定 A1–A12）的索引见 [decisions.md](decisions.md)。
+每条原则的完整规则在 [spec/](spec/) 下对应的主题文档里；所有决定（编号决定和界面决定 A1–A12）的索引见 [decisions.md](decisions.md)。
 
 ---
 
@@ -71,7 +71,7 @@
 | 2 | 主体内容比较（解析、对齐、移动识别、词级差异） | ✅ 完成（M1–M6） | v0.2.0 | [stage2-design](implementation/stage2-design.md) |
 | 3 | 合并与 Clean 导出（结构保护、撤销、进度、自检） | ✅ 完成 | v0.3.0 | [stage3-design](implementation/stage3-design.md) |
 | 4 | Track Changes 导出 | ⬜ 未开始 | — | [export §3](spec/export.md) |
-| 5 | 扩展检查（格式、自动编号比较、段内词级选择、批注等） | ⬜ 未开始 | — | [scope §4](spec/scope.md) |
+| 5 | 扩展检查（格式、段内词级选择、批注等） | ⬜ 未开始 | — | [scope §4](spec/scope.md) |
 | 6 | Excel | ⬜ 未开始 | — | — |
 
 ### 4.2 验收标准（全文见 [scope §5](spec/scope.md)）
@@ -89,7 +89,7 @@
 | 7 | 默认结果 = 新版；全选新版导出 = 新版 | ✅ | `src/testing/invariants.ts`；`export.test.ts` |
 | 8 | 选择和撤销只影响选中的部分 | ✅ | `reviewOps.test.ts` |
 | 9 | 移动内容合成一处，不重复不丢失 | ✅ | `invariants.ts`；`advanced.test.ts` 13 |
-| 10 | 自动编号顺延不算变化 | ✅ | `engine.test.ts` 02；`parseDocx.test.ts` 02 |
+| 10 | 自动编号顺延不算变化（只以 № 提示，决定 38） | ✅ | `engine.test.ts` 02；`parseDocx.test.ts` 02；`hints.test.ts` 02 |
 | 11 | 采用旧版不破坏分节、页面设置、书签、批注结构 | ✅ | `export.test.ts`（05、09、书签和批注标记） |
 | 12 | Clean 导出无未决修订，保留批注和样式，Word 能正常打开 | ⚠️ | 前两点有测试（`export.test.ts` 04、12），64 个导出文件通过 XSD 校验；**还没有在 Windows Word 中实际打开过** |
 | 13 | Track Changes 导出只反映新版到最终版的差异 | ⬜ | Stage 4 |
@@ -105,7 +105,7 @@
 - [ ] Posit Connect 的部署条件（[scope §3.3](spec/scope.md)）
 
 **需要和用户讨论**
-- [ ] 差异颗粒度 G1–G12：差异切得太碎还是太粗（[comparison §2.2](spec/comparison.md)）。建议先用真实文档试完整流程，再讨论
+- [x] 差异颗粒度 G1–G12：已全部确认（决定 35、36，[comparison §2.2](spec/comparison.md)）
 
 **已知限制**（[stage3-design](implementation/stage3-design.md) §9）
 - 段内只能整段取舍（G6），以后做段内词级选择
@@ -114,7 +114,7 @@
 
 **后续阶段**
 - [ ] Stage 4：Track Changes 导出
-- [ ] Stage 5：格式检查、自动编号比较、未比较元素逐项比较、带回含脚注等元素的旧版内容、段内词级选择、批注处理
+- [ ] Stage 5：格式检查（含列表类型）、未比较元素逐项比较、带回含脚注等元素的旧版内容、段内词级选择、批注处理
 - [ ] Stage 6：Excel
 
 **仓库整理**
@@ -129,7 +129,7 @@
 |---|---|
 | 目标、范围、部署、验收标准 | [spec/scope.md](spec/scope.md) |
 | 怎么读取 .docx、已有修订怎么处理 | [spec/reading.md](spec/reading.md) |
-| 什么算差异、差异怎么切分（含待讨论的 G1–G12） | [spec/comparison.md](spec/comparison.md) |
+| 什么算差异、差异怎么切分（含切分规则 G1–G12） | [spec/comparison.md](spec/comparison.md) |
 | 用户怎么选择、什么时候不能采用旧版 | [spec/merge.md](spec/merge.md) |
 | 导出的文件怎么改、怎么自检 | [spec/export.md](spec/export.md) |
 | 界面怎么呈现、进度怎么保存 | [spec/ui.md](spec/ui.md) |
