@@ -1,12 +1,14 @@
 // Final result = concatenation of each segment's chosen side (spec/merge §1).
 // Unreviewed differences count as 'new'. Informational differences are always 'new'.
 
-import type { Block, NodeId, TableBlock, TableCell, TableRow } from './document';
+import type { Block, NodeId, ParagraphBlock, TableBlock, TableCell, TableRow } from './document';
 import type { CellPair, DiffResult, Difference, RowSegment, Segment } from './diff';
 import { DocIndex } from './docIndex';
-import type { Choice } from './review';
+import type { Choice, Selection } from './review';
+import { isHunkSelection, mixedParagraph, type MixedParagraph } from './selection';
 
-export type Origin = 'old' | 'new';
+/** 'mixed' = the new paragraph with some hunks put back to old (decision 42). */
+export type Origin = 'old' | 'new' | 'mixed';
 
 export interface FinalResult {
   blocks: Block[];
@@ -14,19 +16,31 @@ export interface FinalResult {
   origin: Map<NodeId, { side: Origin; diffId: string }>;
 }
 
-export function effectiveChoice(d: Difference, choices: Record<string, Choice>): Choice {
+/**
+ * The side whose blocks occupy a difference's place in the final result. A
+ * per-change selection counts as 'new': its paragraph is the new one, edited.
+ */
+export function effectiveChoice(d: Difference, choices: Record<string, Selection>): Choice {
   if (d.informational) return 'new';
-  return choices[d.id] ?? 'new';
+  const s = choices[d.id];
+  return s === undefined || isHunkSelection(s) ? 'new' : s;
+}
+
+/** The mixed paragraph of a difference with a per-change selection, else undefined. */
+export function mixedOf(d: Difference, choices: Record<string, Selection>, ix: { old: DocIndex; new: DocIndex }): MixedParagraph | undefined {
+  const s = choices[d.id];
+  if (d.informational || !isHunkSelection(s) || !d.perChange) return undefined;
+  return mixedParagraph(ix.old.block(d.old.ids[0]) as ParagraphBlock, ix.new.block(d.new.ids[0]) as ParagraphBlock, d.wordHunks, s);
 }
 
 /** Which side of a diff segment part ends up in the final result, or null for nothing. */
-export function partOutput(part: 'whole' | 'from' | 'to', choice: Choice): Origin | null {
+export function partOutput(part: 'whole' | 'from' | 'to', choice: Choice): Choice | null {
   if (part === 'from') return choice === 'old' ? 'old' : null;
   if (part === 'to') return choice === 'new' ? 'new' : null;
   return choice;
 }
 
-export function buildFinal(result: DiffResult, choices: Record<string, Choice>): FinalResult {
+export function buildFinal(result: DiffResult, choices: Record<string, Selection>): FinalResult {
   const idx = { old: new DocIndex(result.old), new: new DocIndex(result.new) };
   const origin: FinalResult['origin'] = new Map();
 
@@ -37,6 +51,12 @@ export function buildFinal(result: DiffResult, choices: Record<string, Choice>):
         for (const id of s.new.ids) out.push(idx.new.block(id));
       } else if (s.type === 'diff') {
         const d = result.differences[s.diffId];
+        const mixed = mixedOf(d, choices, idx);
+        if (mixed) {
+          origin.set(mixed.block.id, { side: 'mixed', diffId: d.id });
+          out.push(mixed.block);
+          continue;
+        }
         const side = partOutput(s.part, effectiveChoice(d, choices));
         if (!side) continue;
         for (const id of d[side].ids) {

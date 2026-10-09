@@ -6,7 +6,8 @@ import type { Block, CommentInline, InlinePlaceholder, ParagraphBlock, Placehold
 import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { StructureChange } from '../model/hints';
-import type { Choice } from '../model/review';
+import type { Selection } from '../model/review';
+import { hunkChoice, isHunkSelection } from '../model/selection';
 import { Tip } from './kit';
 import { isHidden, type Indexes, type SectionMarker, type SectionMarkers, type Visibility } from './rows';
 
@@ -18,7 +19,7 @@ export interface ViewCtx {
   result: DiffResult;
   ix: Indexes;
   vis: Visibility;
-  choices: Record<string, Choice>;
+  choices: Record<string, Selection>;
   currentId?: string;
   onSelectDiff?: (id: string) => void;
   sections: SectionMarkers;
@@ -41,12 +42,18 @@ export interface Hl {
 
 export type HlMap = Map<string, Hl[]>;
 
-export function highlightsFor(d: Difference, side: Side, vis: Visibility): HlMap {
+/**
+ * Word highlights of one side. With a per-change selection (decision 42) each
+ * hunk also shows which side it uses: the dropped side is dimmed ('w-rej').
+ */
+export function highlightsFor(d: Difference, side: Side, vis: Visibility, sel?: Selection): HlMap {
   const m: HlMap = new Map();
   if (isHidden(d, vis)) return m;
-  for (const h of d.wordHunks) {
+  const mixed = isHunkSelection(sel);
+  for (const [i, h] of d.wordHunks.entries()) {
     if (h.category && vis.hiddenCategories.has(h.category)) continue;
-    const cls = `${side === 'old' ? 'w-del' : 'w-ins'}${h.category === 'whitespace' ? ' w-ws' : ''}${h.category ? ` w-cat` : ''}`;
+    const rej = mixed && hunkChoice(sel, i) !== side ? ' w-rej' : '';
+    const cls = `${side === 'old' ? 'w-del' : 'w-ins'}${h.category === 'whitespace' ? ' w-ws' : ''}${h.category ? ` w-cat` : ''}${rej}`;
     for (const s of h[side]) {
       const list = m.get(s.blockId) ?? [];
       list.push({ start: s.start, end: s.end, cls });
@@ -62,7 +69,8 @@ export function sideClass(d: Difference, side: Side, ctx: ViewCtx): string {
   const c: string[] = ['chg', `chg-${side}`, `kind-${d.kind}`];
   if (d.informational) c.push('chg-info');
   const choice = ctx.choices[d.id];
-  if (!d.informational && choice && choice !== side) c.push('rejected');
+  if (!d.informational && isHunkSelection(choice)) c.push('mixed');
+  else if (!d.informational && choice && choice !== side) c.push('rejected');
   if (!d.informational && choice === side) c.push('chosen');
   if (ctx.currentId === d.id) c.push('current');
   return c.join(' ');
@@ -404,7 +412,7 @@ export function SideSegments({ segs, side }: { segs: Segment[]; side: Side }) {
           const d = result.differences[s.diffId];
           const ids = (s.part === 'to' && side === 'old') || (s.part === 'from' && side === 'new') ? [] : d[side].ids;
           if (ids.length === 0) return null;
-          const hl = highlightsFor(d, side, ctx.vis);
+          const hl = highlightsFor(d, side, ctx.vis, ctx.choices[d.id]);
           return (
             <div
               key={`${d.id}-${i}`}

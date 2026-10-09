@@ -9,6 +9,9 @@ import { buildFinal } from '../model/final';
 import { flattenParagraph } from '../model/flatten';
 import { invertResult } from '../model/invert';
 import type { Choice } from '../model/review';
+import { DocIndex } from '../model/docIndex';
+import type { ParagraphBlock } from '../model/document';
+import { mixedParagraph } from '../model/selection';
 
 export const paragraphTexts = (blocks: Block[]) => {
   const out: string[] = [];
@@ -48,6 +51,18 @@ export function defineInvariantTests(get: () => DiffResult | Promise<DiffResult>
         const other = d[c === 'old' ? 'new' : 'old'].ids;
         expect(other.some((id) => f.origin.has(id))).toBe(false);
       }
+    }
+  });
+
+  it('per-change selection: all old gives the old paragraph, all new the new one (decision 42)', async () => {
+    const r = await get();
+    const ix = { old: new DocIndex(r.old), new: new DocIndex(r.new) };
+    for (const d of Object.values(r.differences).filter((x) => x.perChange)) {
+      const o = ix.old.block(d.old.ids[0]) as ParagraphBlock;
+      const n = ix.new.block(d.new.ids[0]) as ParagraphBlock;
+      const all = (c: Choice) => mixedParagraph(o, n, d.wordHunks, { hunks: d.wordHunks.map(() => c) }).block;
+      expect(flattenParagraph(all('old')).text).toBe(flattenParagraph(o).text);
+      expect(flattenParagraph(all('new')).text).toBe(flattenParagraph(n).text);
     }
   });
 

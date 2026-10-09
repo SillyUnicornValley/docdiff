@@ -27,9 +27,11 @@ import { detectedOnlyRows } from './scopeRows';
 import { sectionHints } from './sections';
 import { commonCategory, fullSpan, similarity, wordDiff } from './wordDiff';
 
-export const ENGINE_VERSION = 'engine-4';
+export const ENGINE_VERSION = 'engine-5';
 
 const isPara = (b: Block): b is ParagraphBlock => b.kind === 'paragraph';
+/** Only text, tabs, line breaks and comment anchors: per-change selection can rebuild it (decision 42). */
+const isPlainPara = (b: Block) => isPara(b) && b.content.every((i) => i.type === 'text' || i.type === 'tab' || i.type === 'break' || i.type === 'comment');
 const isEmptyPara = (b: Block) => isPara(b) && flattenParagraph(b).text.trim() === '';
 const isH1 = (b: Block): b is ParagraphBlock => isPara(b) && b.role.type === 'heading' && b.role.level === 1;
 const cellBlocks = (rows: TableRow[]) => rows.flatMap((r) => r.cells.flatMap((c) => c.blocks));
@@ -85,6 +87,7 @@ class Comparer {
     if (cat && !opts.informational) d.category = cat;
     if ((kind === 'inserted' || kind === 'deleted') && [...oldBlocks, ...newBlocks].every(isEmptyPara)) d.category = 'emptyParagraph';
     if (opts.informational) d.informational = opts.informational;
+    if (kind === 'modified' && !opts.informational && hunks.length >= 2 && hunks.every((h) => h.at) && [...oldBlocks, ...newBlocks].every(isPlainPara)) d.perChange = true;
     if (kind === 'splitJoin') d.summary = oldBlocks.length === 1 ? `1 paragraph split into ${newBlocks.length}` : `${oldBlocks.length} paragraphs joined into 1`;
     return d;
   }

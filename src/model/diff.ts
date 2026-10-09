@@ -57,6 +57,12 @@ export interface WordHunk {
   new: TextSpan[];
   /** Set when this hunk is only a whitespace/quote/dash/case change. */
   category?: NormCategory;
+  /**
+   * Where the hunk starts in the old and new paragraph (flattened offsets). Set
+   * for one-to-one paragraph pairs: a pure insertion or deletion has no span on
+   * one side, and per-change selection needs to know where it goes (decision 42).
+   */
+  at?: { old: number; new: number };
 }
 
 export type UseOldBlockReason =
@@ -99,6 +105,11 @@ export interface Difference {
   similarity?: number;
   /** Short human summary for lists/tooltips, e.g. "12 → 24". Engine may leave empty. */
   summary?: string;
+  /**
+   * Each word hunk can be chosen on its own (decision 42): a modified pair of
+   * plain-text paragraphs (text, tabs, line breaks) with two or more hunks.
+   */
+  perChange?: boolean;
 }
 
 // ---------------------------------------------------------------------------

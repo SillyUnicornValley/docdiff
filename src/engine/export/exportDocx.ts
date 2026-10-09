@@ -12,8 +12,8 @@
 import type { Block, NodeId, ParagraphBlock } from '../../model/document';
 import type { DiffResult, Difference, RowSegment, Segment } from '../../model/diff';
 import { DocIndex } from '../../model/docIndex';
-import { buildFinal, effectiveChoice, partOutput } from '../../model/final';
-import type { Choice } from '../../model/review';
+import { buildFinal, effectiveChoice, mixedOf, partOutput } from '../../model/final';
+import type { Selection } from '../../model/review';
 import { acceptAllRevisions, revisionTotal } from '../docx/acceptRevisions';
 import { parseDocx, type ParsedDocx } from '../docx/parseDocx';
 import { StyleMap } from '../docx/styles';
@@ -73,7 +73,7 @@ class Exporter {
 
   constructor(
     private result: DiffResult,
-    private choices: Record<string, Choice>,
+    private choices: Record<string, Selection>,
     private o: ParsedDocx,
     private n: ParsedDocx,
     newStyles: StyleMap,
@@ -152,6 +152,14 @@ class Exporter {
 
   private diff(s: { diffId: string; part: 'whole' | 'from' | 'to' }, siblings: (Segment | RowSegment)[], i: number, container: Element) {
     const d = this.result.differences[s.diffId];
+    const mixed = mixedOf(d, this.choices, this.idx);
+    if (mixed) {
+      // Per-change selection (decision 42): the new paragraph, edited to the mixed text.
+      if (!d.useOld.available) throw new ExportError(`Difference ${d.id} cannot use old: ${d.useOld.message}`);
+      this.usedOld.add(d.id);
+      this.editor.rewrite(this.el('new', d.new.ids[0]), mixed.block);
+      return;
+    }
     const choice = effectiveChoice(d, this.choices);
     if (choice !== 'old') return;
     if (!d.useOld.available) throw new ExportError(`Difference ${d.id} cannot use old: ${d.useOld.message}`);
@@ -241,7 +249,7 @@ async function acceptOtherParts(pkg: ParsedDocx['pkg']) {
   }
 }
 
-export async function exportClean(oldFile: ExportFile, newFile: ExportFile, result: DiffResult, choices: Record<string, Choice>): Promise<ExportResult> {
+export async function exportClean(oldFile: ExportFile, newFile: ExportFile, result: DiffResult, choices: Record<string, Selection>): Promise<ExportResult> {
   // Read both files again: the export edits a fresh copy, so it can run any number of times.
   const [o, n] = await Promise.all([parseDocx(oldFile.data, 'old', oldFile.name), parseDocx(newFile.data, 'new', newFile.name)]);
   if (o.doc.fingerprint !== result.old.fingerprint || n.doc.fingerprint !== result.new.fingerprint)

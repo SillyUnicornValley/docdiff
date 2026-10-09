@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DiffResult } from '../../model/diff';
-import type { Choice } from '../../model/review';
+import type { Choice, Selection } from '../../model/review';
 import { parseDocx } from '../docx/parseDocx';
 import { compareFiles } from '../index';
 import { makeDocx, p } from '../testing/makeDocx';
@@ -28,13 +28,18 @@ const files = (pair: string) => ({
 });
 
 /** Choice patterns: every difference new / old / alternating / seeded random. */
-function patterns(r: DiffResult): [string, Record<string, Choice>][] {
+function patterns(r: DiffResult): [string, Record<string, Selection>][] {
   const ids = r.order.filter((id) => !r.differences[id].informational && r.differences[id].useOld.available);
   let seed = 7;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
   const pick = (f: (id: string, i: number) => Choice) => Object.fromEntries(ids.map((id, i) => [id, f(id, i)]));
+  // Per-change selections (decision 42): alternate hunks inside each eligible paragraph.
+  const perChange = Object.fromEntries(
+    r.order.filter((id) => r.differences[id].perChange && r.differences[id].useOld.available).map((id, k) => [id, { hunks: r.differences[id].wordHunks.map((_, i): Choice => ((i + k) % 2 ? 'old' : 'new')) }]),
+  );
   return [
     ['all new', {}],
+    ['per change', perChange],
     ['all old', pick(() => 'old')],
     ['alternating', pick((_, i) => (i % 2 ? 'old' : 'new'))],
     ['random', pick(() => (rnd() < 0.5 ? 'old' : 'new'))],
@@ -84,6 +89,23 @@ describe('clean export details', () => {
     expect(out.check.ok).toBe(true);
     expect(xml).toContain('<w:b/></w:rPr><w:t xml:space="preserve">12</w:t>');
     expect(xml).toContain('<w:i/></w:rPr><w:t xml:space="preserve">Participants will be treated for </w:t>');
+  });
+
+  it('per change: only the chosen changes go back to old, other words keep their formatting (decision 42)', async () => {
+    const o = { name: 'o.docx', data: await makeDocx(p('Dose 10 mg on Day 1 and 20 mg on Day 8.')) };
+    const n = { name: 'n.docx', data: await makeDocx(`<w:p>${run('Dose ')}${run('15', '<w:b/>')}${run(' mg on Day 1 and 30 mg on Day 15.')}</w:p>`) };
+    const { result } = await compareFiles(o, n);
+    const d = result.differences[result.order[0]];
+    expect(d.perChange).toBe(true);
+    expect(d.wordHunks).toHaveLength(3);
+    const out = await exportClean(o, n, result, { [d.id]: { hunks: ['old', 'new', 'old'] } });
+    expect(out.check.ok).toBe(true);
+    const parsed = await parseDocx(out.bytes.buffer as ArrayBuffer, 'new', 'x');
+    const xml = new XMLSerializer().serializeToString(parsed.xml);
+    expect(parsed.doc.blocks.map((b) => (b.kind === 'paragraph' ? b.content.map((i) => (i.type === 'text' ? i.text : '')).join('') : ''))).toEqual([
+      'Dose 10 mg on Day 1 and 30 mg on Day 8.',
+    ]);
+    expect(xml).toContain('<w:b/></w:rPr><w:t xml:space="preserve">10</w:t>');
   });
 
   it('keeps a comment range around replaced text', async () => {

@@ -3,7 +3,7 @@ import { COMPARE_STEPS, compareFiles, DocxError, exportClean } from '../engine';
 import { mockForFiles, type MockPair } from '../mock';
 import { sampleFiles, type SamplePair } from '../samples';
 import type { DiffResult } from '../model/diff';
-import type { Choice } from '../model/review';
+import type { Selection } from '../model/review';
 import { invertResult } from '../model/invert';
 import { applyChoices, emptyReview, type Review } from '../model/reviewOps';
 import { readAutosave, writeAutosave } from './autosave';
@@ -180,7 +180,7 @@ export function App() {
           onChangeFiles={() => setScreen('select')}
           toast={push}
           confirm={setConfirmReq}
-          exportDocx={loaded.files && ((choices: Record<string, Choice>) => exportMerged(loaded.result, loaded.files!, choices))}
+          exportDocx={loaded.files && ((choices: Record<string, Selection>) => exportMerged(loaded.result, loaded.files!, choices))}
         />
       )}
       {busy && (
@@ -207,7 +207,7 @@ export function App() {
 }
 
 /** Write the merged Clean .docx from the original files (Stage 3). */
-async function exportMerged(result: DiffResult, files: { old: File; new: File }, choices: Record<string, Choice>) {
+async function exportMerged(result: DiffResult, files: { old: File; new: File }, choices: Record<string, Selection>) {
   const [od, nd] = await Promise.all([files.old.arrayBuffer(), files.new.arrayBuffer()]);
   return exportClean({ name: files.old.name, data: od }, { name: files.new.name, data: nd }, result, choices);
 }

@@ -25,6 +25,7 @@ export function ExportDialog({
   const reviewable = result.order.filter((id) => !result.differences[id].informational);
   const unreviewed = reviewable.filter((id) => !review.state.choices[id]).length;
   const usedOld = reviewable.filter((id) => review.state.choices[id] === 'old').length;
+  const mixed = reviewable.filter((id) => typeof review.state.choices[id] === 'object').length;
   const pending = result.scope.pendingRevisionsInNew;
   const fileName = `${result.new.fileName.replace(/\.docx$/i, '')}_merged_${yyyymmdd()}.docx`;
   const [mode, setMode] = useState<'clean' | 'tracked'>('clean');
@@ -106,7 +107,13 @@ export function ExportDialog({
                 )}
               </li>
               <li>
-                {usedOld} difference(s) set to <b>Use old</b>; everything else comes from the new file.
+                {usedOld} difference(s) set to <b>Use old</b>
+                {mixed > 0 && (
+                  <>
+                    , {mixed} chosen <b>per change</b>
+                  </>
+                )}
+                ; everything else comes from the new file.
               </li>
               {pending > 0 && (
                 <li className="warn">

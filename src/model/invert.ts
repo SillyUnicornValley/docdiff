@@ -35,7 +35,7 @@ export function invertResult(r: DiffResult): DiffResult {
       kind: KIND[d.kind] ?? d.kind,
       old: d.new,
       new: d.old,
-      wordHunks: d.wordHunks.map((h) => ({ ...h, old: h.new, new: h.old })),
+      wordHunks: d.wordHunks.map((h) => ({ ...h, old: h.new, new: h.old, ...(h.at ? { at: { old: h.at.new, new: h.at.old } } : {}) })),
     };
   }
   // Moved content: in the swapped pair the 'to' location comes first in some cases; keep order by first appearance.

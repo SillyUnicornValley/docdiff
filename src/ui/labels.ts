@@ -24,6 +24,7 @@ export const STATUS_LABEL: Record<ReviewStatus, string> = {
   unreviewed: 'Unreviewed · new by default',
   old: 'Using old',
   new: 'Using new',
+  mixed: 'Mixed · chosen per change',
 };
 
 export const SCOPE_STATUS_LABEL: Record<ScopeStatus, string> = {

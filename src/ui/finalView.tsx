@@ -3,8 +3,9 @@
 
 import type { ReactNode } from 'react';
 import type { RowSegment, Segment } from '../model/diff';
-import { effectiveChoice, partOutput } from '../model/final';
-import { BlockView, TableFragment, useView } from './render';
+import type { Difference } from '../model/diff';
+import { effectiveChoice, mixedOf, partOutput } from '../model/final';
+import { BlockView, Paragraph, TableFragment, useView } from './render';
 import type { Row } from './rows';
 
 function FromOld({ children, id }: { children: ReactNode; id: string }) {
@@ -16,15 +17,28 @@ function FromOld({ children, id }: { children: ReactNode; id: string }) {
   );
 }
 
+/** A paragraph chosen per change (decision 42): old parts highlighted. */
+function Mixed({ d, ctx }: { d: Difference; ctx: ReturnType<typeof useView> }) {
+  const m = mixedOf(d, ctx.choices, ctx.ix)!;
+  return (
+    <div className="from-old mixed" title={`Chosen per change (difference ${d.id}): highlighted parts come from the old file`}>
+      <span className="from-old-tag">mixed</span>
+      <Paragraph p={m.block} hl={m.fromOld.map((r) => ({ ...r, cls: 'w-fromold' }))} />
+    </div>
+  );
+}
+
 /** Final content of a cell (or any container) given its segments. */
 export function FinalSegments({ segs }: { segs: Segment[] }) {
-  const { result, ix, choices } = useView();
+  const ctx = useView();
+  const { result, ix, choices } = ctx;
   return (
     <>
       {segs.map((s, i) => {
         if (s.type === 'equal') return s.new.ids.map((id) => <BlockView key={id} b={ix.new.block(id)} />);
         if (s.type === 'diff') {
           const d = result.differences[s.diffId];
+          if (mixedOf(d, choices, ix)) return <Mixed key={i} d={d} ctx={ctx} />;
           const side = partOutput(s.part, effectiveChoice(d, choices));
           if (!side) return null;
           const blocks = d[side].ids.map((id) => <BlockView key={id} b={ix[side].block(id)} />);
@@ -94,6 +108,7 @@ export function finalRowContent(row: Row, ctx: ReturnType<typeof useView>): Reac
   if (row.kind === 'equal') return <BlockView b={row.new} />;
   if (row.kind === 'diff') {
     const d = result.differences[row.diffId];
+    if (mixedOf(d, choices, ix)) return <Mixed d={d} ctx={ctx} />;
     const side = partOutput(row.part, effectiveChoice(d, choices));
     if (!side) return null;
     const blocks = d[side].ids.map((id) => <BlockView key={id} b={ix[side].block(id)} />);

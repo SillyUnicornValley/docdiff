@@ -18,6 +18,15 @@ describe('review operations', () => {
     expect(redo(u).state.choices).toEqual(rv.state.choices);
   });
 
+  it('a per-change selection that is all one side becomes the plain choice (decision 42)', () => {
+    const rv = applyChoices(emptyReview(), 'x', [
+      { diffId: 'd1', to: { hunks: ['old', 'old'] } },
+      { diffId: 'd2', to: { hunks: ['old', 'new'] } },
+    ]);
+    expect(rv.state.choices).toEqual({ d1: 'old', d2: { hunks: ['old', 'new'] } });
+    expect(applyChoices(rv, 'same', [{ diffId: 'd2', to: { hunks: ['old', 'new'] } }]).history.past).toHaveLength(1);
+  });
+
   it('a no-op change adds no history entry', () => {
     const rv = applyChoices(emptyReview(), 'x', [{ diffId: 'd1', to: undefined }]);
     expect(rv.history.past).toHaveLength(0);
@@ -29,6 +38,17 @@ describe('progress files', () => {
     const rv = applyChoices(emptyReview(), 'x', [{ diffId: r01.order[0], to: 'old' }]);
     const res = parseProgressFile(JSON.stringify(makeProgressFile(r01, rv, '0.1.0')), r01);
     expect(res).toEqual({ ok: true, choices: { [r01.order[0]]: 'old' }, skipped: 0 });
+  });
+
+  it('round-trips a per-change selection and skips one that does not fit the difference', () => {
+    const base = Object.values(r01.differences).find((x) => x.wordHunks.length >= 2 && !x.informational)!;
+    const d = { ...base, perChange: true, useOld: { available: true as const } };
+    const r = { ...r01, differences: { ...r01.differences, [d.id]: d } };
+    const hunks = d.wordHunks.map((_, i) => (i % 2 ? 'old' : 'new') as 'old' | 'new');
+    const rv = applyChoices(emptyReview(), 'x', [{ diffId: d.id, to: { hunks } }]);
+    expect(parseProgressFile(JSON.stringify(makeProgressFile(r, rv, '0.5.0')), r)).toEqual({ ok: true, choices: { [d.id]: { hunks } }, skipped: 0 });
+    const bad = { ...makeProgressFile(r, rv, '0.5.0'), choices: { [d.id]: { hunks: ['old'] } } };
+    expect(parseProgressFile(JSON.stringify(bad), r)).toMatchObject({ ok: true, skipped: 1 });
   });
 
   it('is refused for different documents', () => {

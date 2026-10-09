@@ -2,7 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { DiffId, DiffResult, Difference, NormCategory } from '../model/diff';
 import { structureHints } from '../model/hints';
-import type { Choice, ReviewStatus } from '../model/review';
+import type { Choice, ReviewStatus, Selection } from '../model/review';
+import { hunkChoice, statusOfSelection } from '../model/selection';
+import { flattenParagraph } from '../model/flatten';
+import type { ParagraphBlock } from '../model/document';
 import { applyChoices, makeProgressFile, parseProgressFile, redo, statusOf, undo, type Review } from '../model/reviewOps';
 import type { ExportResult } from '../engine';
 import { APP_VERSION } from '../version';
@@ -38,6 +41,10 @@ export const defaultViewOptions = (): ViewOptions => ({
 
 interface Actions {
   choose: (id: DiffId, c: Choice | undefined) => void;
+  /** Per-change selection (decision 42): choose hunk `i` of a difference. */
+  chooseHunk: (id: DiffId, i: number, c: Choice) => void;
+  perChangeOpen: (id: DiffId) => boolean;
+  togglePerChange: (id: DiffId) => void;
   select: (id: DiffId) => void;
   jump: (id: DiffId, part?: 'from' | 'to') => void;
   expand: (runId: string) => void;
@@ -69,11 +76,12 @@ export function CompareView({
   toast: (text: string, tone?: 'info' | 'warn' | 'error') => void;
   confirm: (r: ConfirmRequest) => void;
   /** Writes the merged .docx; absent for mock data (?mock), where export stays simulated. */
-  exportDocx?: (choices: Record<string, Choice>) => Promise<ExportResult>;
+  exportDocx?: (choices: Record<string, Selection>) => Promise<ExportResult>;
 }) {
   const [opts, setOpts] = useState<ViewOptions>(defaultViewOptions);
   const [currentId, setCurrentId] = useState<DiffId | undefined>(undefined);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [perChange, setPerChange] = useState<Set<DiffId>>(new Set());
   const [panel, setPanel] = useState<'scope' | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [tab, setTab] = useState<'content' | 'formatting'>('content');
@@ -152,6 +160,18 @@ export function CompareView({
       if (c === 'old' && !d.useOld.available) return;
       const label = c ? `Use ${c} on #${numberOf.get(id)}` : `Clear #${numberOf.get(id)}`;
       setReview(applyChoices(review, label, [{ diffId: id, to: c }]));
+      setCurrentId(id);
+    },
+    [result, review, setReview, numberOf],
+  );
+
+  const chooseHunk = useCallback(
+    (id: DiffId, i: number, c: Choice) => {
+      const d = result.differences[id];
+      if (!d.perChange || (c === 'old' && !d.useOld.available)) return;
+      const cur = review.state.choices[id];
+      const hunks = d.wordHunks.map((_, k) => (k === i ? c : hunkChoice(cur, k)));
+      setReview(applyChoices(review, `Use ${c} on #${numberOf.get(id)} change ${i + 1}`, [{ diffId: id, to: { hunks } }]));
       setCurrentId(id);
     },
     [result, review, setReview, numberOf],
@@ -261,6 +281,15 @@ export function CompareView({
   const ctx: ViewCtx = { result, ix, vis, choices: review.state.choices, currentId, onSelectDiff: setCurrentId, sections: secMarkers, hints };
   const actions: Actions = {
     choose,
+    chooseHunk,
+    perChangeOpen: (id) => perChange.has(id),
+    togglePerChange: (id) =>
+      setPerChange((s) => {
+        const n = new Set(s);
+        if (n.has(id)) n.delete(id);
+        else n.add(id);
+        return n;
+      }),
     select: setCurrentId,
     jump: (id, part) => goTo(id, part),
     expand: (runId) => setExpanded((s) => new Set(s).add(runId)),
@@ -508,7 +537,7 @@ function BatchMenu({
 }: {
   result: DiffResult;
   reviewable: DiffId[];
-  choices: Record<DiffId, Choice>;
+  choices: Record<DiffId, Selection>;
   defaultSectionId?: string;
   onSection: (sectionId: string, c: Choice) => void;
   onUnreviewedNew: () => void;
@@ -636,7 +665,7 @@ const movedAndChanged = (d: Difference) => d.kind === 'moved' && d.wordHunks.len
 function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'from' | 'to'; compact?: boolean }) {
   const { choices, currentId, ix } = useView();
   const a = useContext(ActionsContext);
-  const status: ReviewStatus | 'info' = d.informational ? 'info' : ((choices[d.id] as Choice | undefined) ?? 'unreviewed');
+  const status: ReviewStatus | 'info' = d.informational ? 'info' : statusOfSelection(choices[d.id]);
   const k = KIND_LABEL[d.kind];
   if (compact) {
     return (
@@ -711,7 +740,9 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
         </div>
       ) : (
         <>
-          <div className={`g-status st-${status}`}>{status === 'unreviewed' ? STATUS_LABEL.unreviewed : status === 'old' ? '✓ Using old' : '✓ Using new'}</div>
+          <div className={`g-status st-${status}`}>
+            {status === 'unreviewed' ? STATUS_LABEL.unreviewed : status === 'old' ? '✓ Using old' : status === 'new' ? '✓ Using new' : '✓ Mixed'}
+          </div>
           <div className="g-btns">
             <button
               className={`choice choice-old${status === 'old' ? ' on' : ''}`}
@@ -737,6 +768,19 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
               Use new
             </button>
           </div>
+          {d.perChange && d.useOld.available && (
+            <button
+              className="link g-perchange"
+              aria-expanded={a.perChangeOpen(d.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                a.togglePerChange(d.id);
+              }}
+            >
+              {a.perChangeOpen(d.id) ? '▾' : '▸'} Choose per change ({d.wordHunks.length})
+            </button>
+          )}
+          {d.perChange && d.useOld.available && a.perChangeOpen(d.id) && <PerChangeList d={d} />}
           {!d.useOld.available && (
             <div className="g-why">
               <Tip tip={d.useOld.message}>Use old unavailable</Tip>
@@ -786,6 +830,50 @@ function DiffControls({ d, part, compact }: { d: Difference; part?: 'whole' | 'f
   );
 }
 
+/** Visible form of a hunk's text for the per-change list. */
+function hunkText(p: ParagraphBlock, spans: { start: number; end: number }[]) {
+  const t = flattenParagraph(p).text;
+  const s = spans.map((x) => t.slice(x.start, x.end)).join('');
+  const shown = s.replace(/ /g, '·').replace(/\u00a0/g, '°').replace(/\t/g, '→').replace(/\n/g, '↵');
+  return shown.length > 40 ? `${shown.slice(0, 40)}…` : shown;
+}
+
+/** One line per word-level change, each with its own Old / New choice (decision 42). */
+function PerChangeList({ d }: { d: Difference }) {
+  const { choices, ix } = useView();
+  const a = useContext(ActionsContext);
+  const op = ix.old.block(d.old.ids[0]) as ParagraphBlock;
+  const np = ix.new.block(d.new.ids[0]) as ParagraphBlock;
+  const sel = choices[d.id];
+  return (
+    <ol className="perchange" onClick={(e) => e.stopPropagation()}>
+      {d.wordHunks.map((h, i) => {
+        const c = sel === undefined ? undefined : hunkChoice(sel, i);
+        const o = hunkText(op, h.old);
+        const n = hunkText(np, h.new);
+        return (
+          <li key={i} className={c ? `pcl-${c}` : ''}>
+            <span className="pc-text">
+              {o ? <span className="pc-old">{o}</span> : <span className="muted">(none)</span>}
+              <span className="pc-arrow">→</span>
+              {n ? <span className="pc-new">{n}</span> : <span className="muted">(none)</span>}
+              {h.category && <span className="pc-cat">{CATEGORY_LABEL[h.category]}</span>}
+            </span>
+            <span className="pc-btns">
+              <button className={`choice choice-old${c === 'old' ? ' on' : ''}`} aria-pressed={c === 'old'} title={`Use old for change ${i + 1}`} onClick={() => a.chooseHunk(d.id, i, 'old')}>
+                Old
+              </button>
+              <button className={`choice choice-new${c === 'new' ? ' on' : ''}`} aria-pressed={c === 'new'} title={`Use new for change ${i + 1}`} onClick={() => a.chooseHunk(d.id, i, 'new')}>
+                New
+              </button>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Row rendering
 // ---------------------------------------------------------------------------
@@ -813,7 +901,7 @@ function sideContent(row: Row, side: 'old' | 'new', ctx: ViewCtx): { node: React
             : 'not in new';
       return { node: <Spacer label={label} />, cls: `spacer ${sideClass(d, side, ctx)}` };
     }
-    const hl = highlightsFor(d, side, ctx.vis);
+    const hl = highlightsFor(d, side, ctx.vis, ctx.choices[d.id]);
     return { node: blocks.map((b) => <BlockView key={b.id} b={b} hl={hl} />), cls: sideClass(d, side, ctx) };
   }
   // table row

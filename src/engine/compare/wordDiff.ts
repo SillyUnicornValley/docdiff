@@ -229,13 +229,18 @@ export function wordDiff(oldBlocks: ParagraphBlock[], newBlocks: ParagraphBlock[
   }
 
   // Group consecutive non-equal ops; merge groups separated by a single equal whitespace token.
-  const groups: { a: Token[]; b: Token[] }[] = [];
-  let cur: { a: Token[]; b: Token[] } | null = null;
+  // `at`: where the group starts on each side (end of the last token before it).
+  const groups: { a: Token[]; b: Token[]; at: { old: number; new: number } }[] = [];
+  let cur: { a: Token[]; b: Token[]; at: { old: number; new: number } } | null = null;
+  let endA = 0;
+  let endB = 0;
   for (let k = 0; k < ops.length; k++) {
     const o = ops[k];
     if (o.type === 'equal') {
       const isWs = /^\s+\|$/u.test(a[o.a].key);
       const nextChanged = ops[k + 1] && ops[k + 1].type !== 'equal';
+      endA = a[o.a].end;
+      endB = b[o.b].end;
       if (cur && isWs && nextChanged) {
         cur.a.push(a[o.a]);
         cur.b.push(b[o.b]);
@@ -244,13 +249,15 @@ export function wordDiff(oldBlocks: ParagraphBlock[], newBlocks: ParagraphBlock[
       cur = null;
       continue;
     }
-    if (!cur) groups.push((cur = { a: [], b: [] }));
-    if (o.type === 'delete') cur.a.push(a[o.a]);
-    else cur.b.push(b[o.b]);
+    if (!cur) groups.push((cur = { a: [], b: [], at: { old: endA, new: endB } }));
+    if (o.type === 'delete') cur.a.push(a[o.a]), (endA = a[o.a].end);
+    else cur.b.push(b[o.b]), (endB = b[o.b].end);
   }
+  const oneToOne = oldBlocks.length === 1 && newBlocks.length === 1;
 
   return groups.map((g) => {
     const h: WordHunk = { old: spansOf(g.a), new: spansOf(g.b) };
+    if (oneToOne) h.at = g.at;
     // A superscript/subscript/hidden change is content, never a normalisation category.
     const marked = [...g.a, ...g.b].some((t) => !t.para && !t.key.endsWith('|') && t.key.includes('|'));
     const c = marked ? undefined : numberingText(g, oldBlocks, newBlocks) ? 'numberingText' : classify(textOf(g.a), textOf(g.b));

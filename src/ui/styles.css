@@ -1800,3 +1800,88 @@ table.from-old-row td {
   white-space: normal;
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------------- per-change selection (decision 42) */
+
+.g-perchange {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.perchange {
+  list-style: decimal;
+  margin: 4px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 11px;
+  text-align: left;
+  cursor: default;
+}
+.perchange li {
+  padding: 3px 0;
+  border-top: 1px dotted var(--line);
+}
+.pc-text {
+  display: block;
+  word-break: break-word;
+  font-family: var(--doc-font);
+  font-size: 12px;
+}
+.pc-old {
+  background: var(--del-word);
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.pc-new {
+  background: var(--ins-word);
+  text-decoration: underline;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.pc-arrow {
+  margin: 0 3px;
+  color: var(--muted);
+}
+.pc-cat {
+  margin-left: 4px;
+  font: italic 10px var(--ui-font);
+  color: var(--warn);
+}
+.pc-btns {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+.pc-btns .choice {
+  padding: 0 8px;
+  font-size: 11px;
+}
+.perchange li.pcl-old .pc-new,
+.perchange li.pcl-new .pc-old {
+  opacity: 0.45;
+}
+.w-rej {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+.cell.mixed {
+  padding-right: 58px;
+}
+.cell.mixed::after {
+  content: '◐ mixed';
+  position: absolute;
+  right: 6px;
+  top: 3px;
+  font: 600 10px/1.4 var(--ui-font);
+  text-transform: uppercase;
+  color: var(--old);
+  letter-spacing: 0.04em;
+}
+.g-status.st-mixed {
+  color: var(--old);
+}
+.w-fromold {
+  background: #ffe8a3;
+  box-shadow: inset 0 -2px 0 var(--old);
+  border-radius: 2px;
+}
