@@ -96,7 +96,7 @@
 | XSD 校验（手动） | `DOCDIFF_EXPORT_DIR=<目录> npx vitest run src/engine/export` 写出全部导出文件，再用 OOXML XSD 校验（Anthropic docx skill 的 `validate.py`，需要 Python 3.10+、lxml）。2026-10-08：64 个导出文件（16 对 × 4 种选择）全部通过；真实样例中只有原文件本来就有的问题（`documenttasks1.xml` 的重复 id），导出未新增任何错误 |
 | 浏览器 | 05 全部采用旧版后导出、下载、提示自检通过；07 导出 0.13 秒 |
 
-**尚未做的验证**：在 Windows Word 中实际打开导出文件。请在公司电脑上用 Word 打开 08、09、11、12 的“全部采用旧版”导出，确认没有“发现无法读取的内容”提示（见 `prototype-test-guide.md`）。
+**尚未做的验证**：在 Windows Word 中实际打开导出文件。请在公司电脑上用 Word 打开 08、09、11、12 的“全部采用旧版”导出，确认没有“发现无法读取的内容”提示（见 `docs/dev guidance/release-checklist.md`）。
 
 ## 9. 已知限制
 

@@ -1,6 +1,6 @@
 # Repo 地图：每个文件夹和根目录文件是干嘛的
 
-> 写于 2026-10-08（v0.3.0）。用来在一段时间没看 repo 后快速找回方向。
+> 写于 2026-10-08（v0.3.0），2026-10-10（v0.5.1）更新。用来在一段时间没看 repo 后快速找回方向。
 > 标记：**[提交]** = 在 git 里；**[忽略]** = 被 `.gitignore` 排除，只在本机；**[生成]** = 由脚本生成，不要手改。
 
 ## 一眼看全貌
@@ -31,8 +31,8 @@ docdiff/
 | `index.html` | Vite 的页面入口，只有一个 `<div id="root">` 和加载 `src/main.tsx` 的 script。 |
 | `vite.config.ts` | Vite 配置：React 插件 + `vite-plugin-singlefile`（把整个应用打成**单个 HTML 文件**，可离线用/发到 Posit Connect）；注入 `__APP_VERSION__`、`__BUILD_DATE__`；vitest 只扫 `src/**/*.test.ts`（避免扫 agent 文件夹卡住）。 |
 | `tsconfig.json` | TypeScript 编译选项（严格模式、只做类型检查不输出）。 |
-| `tsconfig.tsbuildinfo` | `tsc -b` 的增量编译缓存。**目前被提交进了 git**，其实是本机缓存，建议加进 `.gitignore` 并从 git 移除。 |
-| `.gitignore` | 忽略 `node_modules/`、`dist/`、`.DS_Store`、`*.local`。 |
+| `tsconfig.tsbuildinfo` | `tsc -b` 的增量编译缓存。**[忽略]** |
+| `.gitignore` | 忽略 `node_modules/`、`dist/`、`.DS_Store`、`*.local`、`tsconfig.tsbuildinfo`。 |
 | `CLAUDE.md` | 给 Claude Code 的项目说明。**[生成]** 自 `.ruler/AGENTS.md`，不要直接改。 |
 | `AGENTS.md` | 同一份说明，给 Codex 等通用 agent 读。**[生成]** |
 | `skills-lock.json` | 用 `npx skills` 装的第三方 skill 清单（目前只有 `archify`，画架构图用），`apply-ruler.sh` 据此跳过它们。 |
@@ -112,12 +112,13 @@ URL 带 `?mock` 时使用。`builder.ts` 用"相同/变化"描述快速造出 Di
 
 | 文件 | 作用 |
 |---|---|
-| `overview.md` | **总入口**：目标、设计原则、架构、阶段状态、验收标准逐条状态、待办总清单、文档索引。 |
-| `decisions.md` | 决定索引：第 1–32 条和界面决定 A1–A12，每条一行，链接到写进的主题文档。代码里的 "decision N" 指这里。 |
+| `overview.md` | **总入口**：产品是什么、开发路线（已完成 → 发布前验证 → 以后的方向）、设计原则、架构、验收标准逐条状态、已知限制、文档索引。 |
+| `user-guide.md` | **给同事看的使用说明（英文）**：功能、使用步骤、注意事项、常见问题。docs/ 中唯一的英文文档（决定 48）。 |
+| `decisions.md` | 决定索引：第 1–48 条和界面决定 A1–A12，每条一行，链接到写进的主题文档。代码里的 "decision N" 指这里。 |
 | `spec/` | 现行规则，按主题拆分：`scope`（目标、范围、部署、验收标准）、`reading`（支持的文件、已有修订）、`comparison`（比较规则、颗粒度 G1–G12、元素逐项状态）、`merge`（合并模型）、`export`（导出规则）、`ui`（界面与进度）。代码里的 "spec/xxx §n" 指这里。 |
 | `implementation/` | 技术设计：`stage2-design.md`（解析和比较引擎，里程碑 M1–M6）、`stage3-design.md`（导出实现、自检、XSD 校验）、`stage5-design.md`（扩展检查）。 |
 | `archive/` | 不再维护的原文快照（设计审阅 v0.1、原型说明），以及旧章节号到新文件的对照表。 |
-| `dev guidance/` | `prototype-test-guide.md` 手工测试步骤；`ruler-workflow.md` AI agent 指令的管理方法。 |
+| `dev guidance/` | `release-checklist.md` 发布前验证清单（公司环境、Windows Word、真实文档）；`web-worker-check.md` 检查公司浏览器能否使用 Web Worker；`ruler-workflow.md` AI agent 指令的管理方法。 |
 | `repo-map.md` | 本文件。 |
 
 ---
@@ -131,7 +132,7 @@ URL 带 `?mock` 时使用。`builder.ts` 用"相同/变化"描述快速造出 Di
 | `build_testdocs_advanced.py` | 生成 08–15 号（导出格式、节与页眉、复杂表格、域与控件、修订+批注、重排与重复、Unicode、真实 SOP）。 |
 | `build_testdocs_stage5.py` | 生成 16–18 号（格式、脚注链接图片、批注），Stage 5 用。 |
 | `docs/*_old.docx` / `*_new.docx` | 生成好的文档对；`07`、`15` 另有 `*_changes.txt` 列出改了什么。 |
-| `docs/real examples/` | 两份真实的 Data Management Plan（v1.01 和 V3.02），用来手工试真实文件。**注意：已提交进 git**，如果是公司内部文件，请确认可以放在 repo 里；`samples.ts` 不会把它们打进页面。 |
+| `docs/real examples/` | 两份真实的 Data Management Plan（v1.01 和 V3.02），用来手工试真实文件。已提交进 git（用户确认可以，2026-10-09）；`samples.ts` 不会把它们打进页面。 |
 
 ---
 

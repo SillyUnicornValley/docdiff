@@ -2,14 +2,17 @@
 
 A browser-only tool for comparing and merging two Word (.docx) files. It targets English documents with tables on company Windows browsers; Excel support comes later. All processing runs locally in the browser. The app can be published to Posit Connect or used offline as a single HTML file.
 
-> **Language rule:** The UI (labels, buttons, messages, tooltips) is in English. Project docs in `docs/` are in Chinese. Talk with the user in Chinese.
+> **Language rule:** The UI (labels, buttons, messages, tooltips) is in English. Project docs in `docs/` are in Chinese, except `docs/user-guide.md`, which is for English-speaking colleagues and is in English (decision 48). Talk with the user in Chinese.
 
 ## Status
 
-- **Stage 1 (done):** UI prototype with hand-written mock data (v0.1.0). UI decisions A1–A12 are in `docs/decisions.md` §2.
-- **Stage 2 (done, v0.2.0):** a real .docx parser and diff engine that produce the same `DiffResult` (`src/model/diff.ts`). Plan and milestones M1–M6: `docs/implementation/stage2-design.md`. Milestones M1–M6 are done; sample pairs are the built-in testdocs (`src/samples.ts`), and the hand-written mocks appear with `?mock`.
-- **Stage 3 (done, v0.3.0):** Clean .docx export — the user's choices applied to the revision-accepted new file, then the file is re-read and checked against the final-result preview (`docs/implementation/stage3-design.md`, decisions 24–32). Testdocs 08–15 (`testdocs/build_testdocs_advanced.py`) cover harder cases. Track Changes export (Stage 4) is postponed (decision 39). v0.3.1 moves explanations into hover popovers (decision 40). Difference granularity rules G1–G12 (`docs/spec/comparison.md` §2.2) were confirmed by the user (decisions 35–36).
-- **Stage 5 (done, v0.5.0; v0.5.1):** Extended checks (`docs/implementation/stage5-design.md`, decisions 41–46): per-change selection inside a modified paragraph; "Use old" for content with footnotes, links, fields, pictures and equations (copied into the new file); an Other parts tab comparing notes, headers/footers, text boxes, link addresses, pictures, properties and comments item by item, shown only, never choices. The formatting check was withdrawn in v0.5.1 (decision 47): formatting is not checked, and will be designed separately later as its own result (content only / formatting only / both). Testdocs 16–18 (`testdocs/build_testdocs_stage5.py`).
+The basic product is complete (v0.5.1): UI prototype → Word content comparison → per-difference choice (old/new, including per-change choice inside a paragraph) → Clean .docx export with self-check, plus extended checks (Other parts tab, bringing back old content with notes, links, pictures). Roadmap and status: `docs/overview.md` §2.
+
+- **Next:** validation in the company environment (Windows Word opens exports, company browsers, Posit Connect, real documents) — `docs/dev guidance/release-checklist.md`. When it passes, release v1.0.0 (decision 48).
+- **Later, not scheduled:** formatting comparison as its own result (decision 47), Track Changes export (decision 39), making Other parts choosable, Excel.
+- **Stage numbers** (Stage 1–6) are historical labels from the build order, still used in code comments, decisions and `docs/implementation/`: Stage 1 prototype (v0.1.0, UI decisions A1–A12); Stage 2 parser and diff engine (v0.2.0); Stage 3 Clean export (v0.3.0, decisions 24–32); Stage 4 Track Changes export (postponed); Stage 5 extended checks (v0.5.0, decisions 41–46; formatting check withdrawn in v0.5.1, decision 47); Stage 6 Excel.
+- Difference granularity rules G1–G12 (`docs/spec/comparison.md` §2.2) are confirmed (decisions 35–36). Explanations go into hover popovers (decision 40).
+- Sample pairs on the start page are testdocs 01–18 (`src/samples.ts`); the hand-written mocks appear with `?mock`.
 
 ## Commands
 
@@ -35,7 +38,9 @@ scripts/apply-ruler.sh      # regenerate agent instructions after editing .ruler
 
 ## Key documents
 
-Start at `docs/overview.md` (goal, design principles, stage status, acceptance criteria, to-do list, doc index).
+Start at `docs/overview.md` (what the product is, roadmap, design principles, acceptance criteria, known limitations, doc index).
+
+- `docs/user-guide.md`: user guide for colleagues (English): features, how to use, notes and limitations, FAQ. Update it when user-visible behavior changes.
 
 - `docs/spec/`: current rules by topic — `scope.md` (goal, scope, deployment, acceptance criteria), `reading.md` (supported files, existing revisions and revision types), `comparison.md` (what counts as a difference, granularity G1–G12, moves, tables, not-compared elements, per-element support status), `merge.md` (merge model, review states, when "Use old" is unavailable), `export.md` (export rules, structure protection, self-check), `ui.md` (UI and review progress)
 - `docs/decisions.md`: decision log — numbered decisions and UI decisions A1–A12; code comments cite "decision N"
@@ -44,7 +49,7 @@ Start at `docs/overview.md` (goal, design principles, stage status, acceptance c
 - `docs/implementation/stage5-design.md`: Stage 5 extended checks (per-change selection, bringing back notes/links/pictures, formatting check, other parts, comments)
 - `docs/archive/`: unmaintained snapshots (design review v0.1, prototype notes) and the map from old "spec §x.y" numbers to the new files
 - `docs/repo-map.md`: what each folder and file is for
-- `docs/dev guidance/prototype-test-guide.md`: manual test steps
+- `docs/dev guidance/release-checklist.md`: manual validation before v1.0 (company browsers, Windows Word, real documents, Posit Connect)
 - `docs/dev guidance/ruler-workflow.md`: how agent instructions are managed
 
 ## Working with the user
@@ -52,7 +57,7 @@ Start at `docs/overview.md` (goal, design principles, stage status, acceptance c
 - Discuss each stage thoroughly before building it.
 - Ask for decisions as multiple-choice questions, with a recommendation.
 - Explain edge cases with concrete examples.
-- Record each decision as one row in `docs/decisions.md` and update the matching `docs/spec/` file; update the status in `docs/overview.md` §4 when a stage or acceptance criterion changes.
+- Record each decision as one row in `docs/decisions.md` and update the matching `docs/spec/` file; update the status in `docs/overview.md` §2 and §5 when a stage or acceptance criterion changes, and `docs/user-guide.md` when user-visible behavior changes.
 
 ## Agent instructions (Ruler)
 

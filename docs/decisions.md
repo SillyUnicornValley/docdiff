@@ -58,6 +58,7 @@
 | 45 | 10-10 | 原来“只检测”的部分 | 新增 Other parts 标签页逐项比较：脚注、尾注、页眉页脚（按节）、文本框、超链接地址、图片、文档属性；只提示，导出保留新版 | [comparison §5、§8](spec/comparison.md)、[ui §3](spec/ui.md) |
 | 46 | 10-10 | 批注处理 | 旧版批注也显示（灰色 “Old comment”）；Other parts › Comments 逐条比较（相同、批注文字改了、锚定文字改了、只在一边）；导出仍只保留新版批注、不带入旧版批注；导出前提示有几处 Use old 的内容挂着新版批注 | [comparison §5](spec/comparison.md)、[export §1](spec/export.md) |
 | 47 | 10-10 | 格式检查是否留在 Stage 5 | 撤回决定 44，删除格式检查：Formatting 标签页恢复为 “not checked”，正文不再显示 “Aa”，View 菜单去掉对应开关。原因：用户本来打算格式检查以后单独做；内容和格式基本互不相关，一起显示会让比较页面太拥挤。以后的设想：内容比较、格式比较各出一套结果，用户可选只看内容、只看格式，或者两者同时显示（同时显示也要提供）。到时再单独讨论。已删除的实现见 stage5-design §4，留作参考。版本 v0.5.1 | [comparison §1、§9](spec/comparison.md)、[ui §3](spec/ui.md)、[stage5-design](implementation/stage5-design.md) §4 |
+| 48 | 10-10 | 产品路线和版本 | 基本功能（界面原型 → Word 内容比较 → 逐处选择 → 合并导出，加上扩展检查）在 v0.5.1 已完成。总览改为按「已完成的基本功能 → 发布前验证 → 以后的方向（格式比较、Track Changes 导出、Excel）」组织，原 Stage 编号只作历史标识。公司环境验证（Windows Word 打开导出文件、公司浏览器、Posit Connect、真实文档）通过后才发布 v1.0.0。给同事的使用说明用英文 Markdown（`docs/user-guide.md`），是 docs/ 中唯一的英文文档 | [overview §2](overview.md)、[scope §4、§6](spec/scope.md)、[user-guide](user-guide.md) |
 
 ## 2. 界面决定 A1–A12（原型阶段，2026-10-07）
 
