@@ -48,17 +48,9 @@ export function ScopePanel({ result, hints, onClose }: { result: DiffResult; hin
 
         <section className="scope-sec">
           <h3>Formatting</h3>
-          {s.formatting === 'flagged' ? (
-            <div className="scope-row">
-              <span className="pill pill-flagged">Flagged only</span> Paragraph style, alignment, indents, spacing, list type, bold/italic/underline, font, size,
-              colour, highlight and table style of content both files share: {result.formatChanges?.length ?? 0} difference(s), listed in the Formatting tab
-              and marked Aa in the text. Not choosable; the export keeps the new formatting.
-            </div>
-          ) : (
-            <div className="scope-row">
-              <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting.
-            </div>
-          )}
+          <div className="scope-row">
+            <span className="pill pill-notchecked">Not checked</span> Fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting.
+          </div>
           <div className="scope-row">
             <span className="pill pill-flagged">Flagged only</span> Heading levels: changes are marked ⚑ in the text but cannot be chosen; the export keeps the new file's level.
           </div>

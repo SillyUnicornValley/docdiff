@@ -73,9 +73,9 @@ docdiff/
 | `index.ts` | 引擎入口：两个 .docx → DiffResult。解析在主线程，比较在 Web Worker。 |
 | `compare.worker.ts` | Web Worker：在后台线程跑比较，避免页面卡死。 |
 | `hash.ts` | 指纹：内容用快速哈希，文件用 SHA-256（自动保存/进度文件识别同一对文件）。 |
-| `docx/` | **读取 .docx**：`package.ts` 打开 zip 包并解析关系；`acceptRevisions.ts` 先接受所有已有修订；`readBody.ts` 读正文成 DocModel；`styles.ts` 标题级别/样式继承；`formatting.ts` 生效格式（格式检查用）；`numbering.ts` 计算 Word 显示的自动编号（"3."、"a)"）；`xml.ts` DOM 小工具；`parseDocx.ts` 串起来。 |
+| `docx/` | **读取 .docx**：`package.ts` 打开 zip 包并解析关系；`acceptRevisions.ts` 先接受所有已有修订；`readBody.ts` 读正文成 DocModel；`styles.ts` 标题级别/样式继承；`numbering.ts` 计算 Word 显示的自动编号（"3."、"a)"）；`xml.ts` DOM 小工具；`parseDocx.ts` 串起来。 |
 | `align/` | **序列对齐**：`myers.ts` 经典 Myers diff；`alignBlocks.ts` 先用唯一内容做锚点再对齐段落/表格行。 |
-| `compare/` | **生成 DiffResult**：`compare.ts` 主流程（正文、单元格、嵌套表格同一套逻辑）；`wordDiff.ts` 段落内逐词比较与相似度；`keys.ts` 内容键；`sections.ts` 按内容配对节并提示页眉页脚差异；`scopeRows.ts` 统计"只检测"项；`formatting.ts` 格式检查（决定 44）；`otherParts.ts` 脚注、页眉页脚、文本框、链接、图片、属性、批注的逐项比较（决定 45、46）。 |
+| `compare/` | **生成 DiffResult**：`compare.ts` 主流程（正文、单元格、嵌套表格同一套逻辑）；`wordDiff.ts` 段落内逐词比较与相似度；`keys.ts` 内容键；`sections.ts` 按内容配对节并提示页眉页脚差异；`scopeRows.ts` 统计"只检测"项；`otherParts.ts` 脚注、页眉页脚、文本框、链接、图片、属性、批注的逐项比较（决定 45、46）。 |
 | `export/` | **Stage 3 导出 Clean .docx**：`exportDocx.ts` 主流程（以接受修订后的新文件为底，套用用户选择）；`paragraphEdit.ts` 对修改过的段落就地改回旧文本；`importOld.ts` 把旧文件内容搬进来；`carry.ts` 把旧内容引用的链接、图片、脚注复制进新文件（决定 43）；`structure.ts` 删除内容时保护书签/批注等结构；`dom.ts` 写 XML 的工具（保证元素顺序符合 schema）；`selfCheck.ts` 导出后重新读取并与预览逐块核对。 |
 | `testing/` | 测试辅助：`files.ts` 读 testdocs；`makeDocx.ts` 用一段 XML 造最小 .docx。 |
 | `*.test.ts` | 引擎测试（`engine`、`advanced` = testdocs 08–15、`stage5` = testdocs 16–18、`boundaries`、`export`、`parseDocx`、`myers`）。 |
@@ -91,7 +91,6 @@ docdiff/
 | `render.tsx` | 段落/表格的渲染与逐词高亮。 |
 | `finalView.tsx` | "最终结果"视图，标出来自旧文件的内容。 |
 | `ScopePanel.tsx` | 检查范围面板。 |
-| `FormattingTab.tsx` | Formatting 标签页：格式不同之处的列表（决定 44）。 |
 | `OtherPartsTab.tsx` | Other parts 标签页：批注、脚注、页眉页脚、文本框、链接、图片、属性（决定 45、46）。 |
 | `ExportDialog.tsx` | 导出对话框。 |
 | `autosave.ts` | 浏览器本地自动保存选择（辅助手段，进度文件才是正式保存方式）。 |

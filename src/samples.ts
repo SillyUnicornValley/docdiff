@@ -91,8 +91,8 @@ export const SAMPLE_PAIRS: SamplePair[] = [
   },
   {
     id: '16',
-    title: '16 · Formatting',
-    description: 'Formatting-only changes: bold, colour, font, alignment, spacing, list type, table style; style vs direct formatting.',
+    title: '16 · Formatting-only changes',
+    description: 'Bold, colour, font, alignment, spacing, list type and table style changes: not differences (formatting is not checked yet); one number change.',
   },
   {
     id: '17',

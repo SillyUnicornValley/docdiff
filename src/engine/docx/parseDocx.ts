@@ -7,7 +7,6 @@ import { acceptAllRevisions, revisionTotal } from './acceptRevisions';
 import { NumberingState } from './numbering';
 import { openDocx, parseRels, relsPathOf, type DocxPackage, type Relationship } from './package';
 import { BodyReader } from './readBody';
-import { FormatResolver } from './formatting';
 import { StyleMap } from './styles';
 import { DocxError, NS, plainText, wAttr, wChild, wChildren } from './xml';
 
@@ -217,7 +216,7 @@ export async function parseDocx(data: ArrayBuffer, side: Side, fileName: string)
   const media = await mediaFingerprints(pkg);
   const hf = await headerFooterFingerprints(pkg);
 
-  const ctx = { side, styles, numbering, rels: pkg.rels, footnotes, endnotes, nonPortableNotes: { footnotes: fn.nonPortable, endnotes: en.nonPortable }, comments, media, formats: new FormatResolver(stylesXml) };
+  const ctx = { side, styles, numbering, rels: pkg.rels, footnotes, endnotes, nonPortableNotes: { footnotes: fn.nonPortable, endnotes: en.nonPortable }, comments, media };
   const reader = new BodyReader(ctx);
   const r = reader.readBody(body);
 
@@ -271,7 +270,6 @@ export async function parseDocx(data: ArrayBuffer, side: Side, fileName: string)
     commentCount: comments.size,
     parts: docParts,
     comments: commentItems,
-    runFormats: r.runFormats,
     bookmarks: [...new Set(Array.from(body.getElementsByTagNameNS(NS.w, 'bookmarkStart')).map((b) => wAttr(b, 'name') ?? ''))].filter(Boolean),
     notesParts: { footnotes: fn.present, endnotes: en.present },
   };

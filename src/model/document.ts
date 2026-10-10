@@ -127,30 +127,12 @@ export interface Numbering {
   format: 'bullet' | 'number';
   /** Computed label: "3.", "a)", "•", "2.1". */
   label: string;
-  /** The kind of list, for the formatting check (decision 44): "Bullet •", "Numbered 1.", "Numbered a)". */
-  listStyle?: string;
-}
-
-/**
- * Effective formatting as labelled values, e.g. { Bold: 'on', Size: '11 pt' }
- * (decision 44). Only for the formatting check: never part of the content.
- */
-export type FormatProps = Record<string, string>;
-
-/** Formatting of one paragraph: its own properties and its characters' properties. */
-export interface ParagraphFormat {
-  /** Paragraph style name, alignment, indents, spacing. */
-  para: FormatProps;
-  /** Character formatting as [start, end, index into DocModel.runFormats] over the flattened text. */
-  runs: [number, number, number][];
 }
 
 export interface ParagraphBlock {
   kind: 'paragraph';
   id: NodeId;
   role: ParagraphRole;
-  /** Formatting check only (decision 44). */
-  format?: ParagraphFormat;
   /** Present on auto-numbered list items AND auto-numbered headings. */
   numbering?: Numbering;
   content: Inline[];
@@ -183,8 +165,6 @@ export interface TableBlock {
   gridColumns: number;
   /** Relative column widths, length = gridColumns. */
   columnWidths?: number[];
-  /** Table style name (formatting check, decision 44). */
-  style?: string;
   rows: TableRow[];
 }
 
@@ -311,8 +291,6 @@ export interface DocModel {
   parts?: DocParts;
   /** Comments in body order (decision 46). */
   comments?: CommentItem[];
-  /** Distinct character formats referred to by ParagraphFormat.runs (decision 44). */
-  runFormats?: FormatProps[];
   /** Bookmark names in the body: a cross-reference brought back needs its bookmark (decision 43). */
   bookmarks?: string[];
   /** The file has a footnotes / endnotes part to copy notes into (decision 43). */

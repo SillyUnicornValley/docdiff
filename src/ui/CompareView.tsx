@@ -16,7 +16,6 @@ import { CATEGORY_LABEL, KIND_LABEL, STATUS_LABEL } from './labels';
 import { BlockView, hasNewComment, highlightsFor, SectionMarkerView, SideSegments, sideClass, TableFragment, useView, ViewContext, type ViewCtx } from './render';
 import { buildRows, foldRows, isHidden, makeIndexes, rowDiffIds, sectionMarkers, withSectionRows, type Row, type Visibility } from './rows';
 import { ScopePanel } from './ScopePanel';
-import { FormattingTab } from './FormattingTab';
 import { OtherPartsTab, otherPartsCount } from './OtherPartsTab';
 import type { Block } from '../model/document';
 import { forEachBlock } from '../model/docIndex';
@@ -29,7 +28,6 @@ export interface ViewOptions {
   compareToc: boolean;
   compareFields: boolean;
   showNumbering: boolean;
-  showFormatting: boolean;
   preview: 'off' | 'column' | 'only';
 }
 
@@ -41,7 +39,6 @@ export const defaultViewOptions = (): ViewOptions => ({
   compareToc: false,
   compareFields: false,
   showNumbering: true,
-  showFormatting: true,
   preview: 'off',
 });
 
@@ -101,9 +98,8 @@ export function CompareView({
   const levelList = structure.levels;
   const hints = useMemo(() => {
     const byId = (cs: typeof levelList) => new Map(cs.flatMap((c) => [[c.oldId, c] as const, [c.newId, c] as const]));
-    const formats = new Map((result.formatChanges ?? []).flatMap((c) => [[c.oldId, c] as const, [c.newId, c] as const]));
-    return { levels: byId(structure.levels), numbering: byId(structure.numbering), formats };
-  }, [structure, result]);
+    return { levels: byId(structure.levels), numbering: byId(structure.numbering) };
+  }, [structure]);
   const allRows = useMemo(() => withSectionRows(buildRows(result, ix), secMarkers), [result, ix, secMarkers]);
   const vis: Visibility = useMemo(
     () => ({
@@ -111,9 +107,8 @@ export function CompareView({
       compareToc: opts.compareToc,
       compareFields: opts.compareFields,
       showNumbering: opts.showNumbering,
-      showFormatting: opts.showFormatting,
     }),
-    [opts.hiddenCategories, opts.compareToc, opts.compareFields, opts.showNumbering, opts.showFormatting],
+    [opts.hiddenCategories, opts.compareToc, opts.compareFields, opts.showNumbering],
   );
   // Reviewable differences are numbered 1..N; info-only ones (TOC, fields) i1, i2…
   const numberOf = useMemo(() => {
@@ -293,7 +288,7 @@ export function CompareView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey]);
 
-  // "Show in document" from the Formatting and Other parts tabs: the row holding a block (at any depth).
+  // "Show in document" from the Other parts tab: the row holding a block (at any depth).
   const rowKeyOfBlock = useMemo(() => {
     const m = new Map<string, string>();
     const add = (blocks: Block[], key: string) => forEachBlock(blocks, (b) => m.set(b.id, key));
@@ -377,7 +372,7 @@ export function CompareView({
                 Content
               </button>
               <button role="tab" aria-selected={tab === 'formatting'} className={tab === 'formatting' ? 'active' : ''} onClick={() => setTab('formatting')}>
-                Formatting <span className="muted">· {result.formatChanges ? result.formatChanges.length : 'not checked'}</span>
+                Formatting <span className="muted">· not checked</span>
               </button>
               <button role="tab" aria-selected={tab === 'other'} className={tab === 'other' ? 'active' : ''} onClick={() => setTab('other')}>
                 Other parts <span className="muted">· {result.otherParts ? otherPartsCount(result.otherParts) : 'not compared'}</span>
@@ -464,13 +459,6 @@ export function CompareView({
                 </button>
               </Tip>
             )}
-            {(result.formatChanges?.length ?? 0) > 0 && (
-              <Tip tip="Paragraphs and tables formatted differently are marked Aa in the text. Shown only, not choosable: the export keeps the new file's formatting. Click to list them.">
-                <button className="link fmt" onClick={() => setTab('formatting')}>
-                  Aa {result.formatChanges!.length} formatting difference(s)
-                </button>
-              </Tip>
-            )}
             {mayDiffer > 0 && (
               <Tip tip="Parts outside the main text (such as notes, headers, footers or pictures) differ between the two files. Shown only, not choosable. Click to see them.">
                 <button className="link" onClick={() => (result.otherParts ? setTab('other') : setPanel('scope'))}>
@@ -481,7 +469,17 @@ export function CompareView({
           </div>
 
           {tab === 'formatting' ? (
-            <FormattingTab result={result} onShow={(c) => showBlock(c.newId)} onBack={() => setTab('content')} />
+            <div className="formatting-notice">
+              <h2>Formatting: not checked</h2>
+              <p>Formatting comparison (fonts, sizes, colours, bold/italic, spacing, styles, list types, table formatting) is not available yet. Heading level changes are flagged in the text (⚑) but cannot be chosen.</p>
+              <p>
+                This does <b>not</b> mean the formatting is the same. The Content view shows both documents in one reading style; heading levels and list types are shown as they
+                are in each file but are not compared.
+              </p>
+              <button className="btn" onClick={() => setTab('content')}>
+                Back to content
+              </button>
+            </div>
           ) : tab === 'other' ? (
             <OtherPartsTab result={result} onShow={showBlock} onBack={() => setTab('content')} />
           ) : (
@@ -697,10 +695,6 @@ function ViewMenu({
           <label>
             <input type="checkbox" checked={opts.compareFields} onChange={(e) => set('compareFields', e.target.checked)} /> Compare date, page and other fields
             {!hasInfo('fields') && <span className="muted"> (none in this pair)</span>}
-          </label>
-          <label>
-            <input type="checkbox" checked={opts.showFormatting} onChange={(e) => set('showFormatting', e.target.checked)} /> Mark formatting changes (Aa)
-            <span className="muted"> ({result.formatChanges?.length ?? 0})</span>
           </label>
           <label>
             <input type="checkbox" checked={opts.showNumbering} onChange={(e) => set('showNumbering', e.target.checked)} /> Mark automatic numbering changes

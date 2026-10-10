@@ -1886,30 +1886,8 @@ table.from-old-row td {
   border-radius: 2px;
 }
 
-/* ---------------------------------------------------------------- formatting check (decision 44) */
+/* ---------------------------------------------------------------- Other parts tab lists (decisions 45–46) */
 
-.fmt-mark {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 5px;
-  border: 1px solid #a475f9;
-  border-radius: 8px;
-  color: #6639ba;
-  background: #fbf7ff;
-  font: 600 10px/1.6 var(--ui-font);
-  vertical-align: 1px;
-  cursor: help;
-}
-.fmt-mark-n {
-  font-weight: 400;
-  opacity: 0.8;
-}
-.table-fmt {
-  margin: 2px 0;
-}
-.table-fmt .fmt-mark {
-  margin-left: 0;
-}
 .fmt-items {
   border-collapse: collapse;
   margin-top: 4px;
@@ -1935,11 +1913,6 @@ table.from-old-row td {
 .fmt-arrow {
   color: var(--muted);
 }
-.fmt-where {
-  color: var(--muted);
-  font-family: var(--doc-font);
-  padding-left: 10px !important;
-}
 .fmt-tab {
   flex: 1;
   overflow: auto;
@@ -1954,39 +1927,6 @@ table.from-old-row td {
 }
 .fmt-head p {
   margin: 0 0 10px;
-}
-.fmt-filter select {
-  margin-left: 4px;
-}
-.fmt-list {
-  max-width: 900px;
-  margin: 12px 0 0;
-  padding-left: 28px;
-}
-.fmt-card {
-  margin-bottom: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.fmt-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.fmt-kind {
-  font: 600 10px var(--ui-font);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.fmt-text {
-  flex: 1;
-  font-family: var(--doc-font);
-  font-size: 14px;
-  min-width: 0;
-}
-.link.fmt {
-  color: #6639ba;
 }
 .row-flash > .cell.old,
 .row-flash > .cell.new {
@@ -2004,9 +1944,6 @@ table.from-old-row td {
 @media (max-width: 700px) {
   .fmt-tab {
     padding: 12px;
-  }
-  .fmt-card-head {
-    flex-wrap: wrap;
   }
 }
 

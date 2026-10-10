@@ -195,25 +195,6 @@ export interface SectionHint {
   result: 'same' | 'mayDiffer' | 'onlyOld' | 'onlyNew';
 }
 
-/** One formatting property that differs (decision 44), e.g. Bold: off → on on “must”. */
-export interface FormatItem {
-  property: string;
-  old: string;
-  new: string;
-  /** Character formatting: the affected words (new side), one entry per place. */
-  places?: string[];
-}
-
-/** Formatting differences of one pair of paragraphs or tables. Shown only, never a choice. */
-export interface FormatChange {
-  target: 'paragraph' | 'table';
-  oldId: NodeId;
-  newId: NodeId;
-  /** Start of the new paragraph's text (or the table's first cell), for lists. */
-  text: string;
-  items: FormatItem[];
-}
-
 // ---------------------------------------------------------------------------
 // Other parts, compared item by item and shown only (decisions 45–46)
 // ---------------------------------------------------------------------------
@@ -275,8 +256,7 @@ export interface CheckScope {
   fingerprints: FingerprintHint[];
   /** Headers and footers, per section and variant. */
   sectionHints: SectionHint[];
-  /** 'flagged' since Stage 5: formatting is compared and shown, not choosable (decision 44). */
-  formatting: 'notChecked' | 'flagged';
+  formatting: 'notChecked';
   unsupportedRevisions: { side: 'old' | 'new'; type: string; location: string }[];
   /** Pending revisions in the NEW file; they will be accepted on export. */
   pendingRevisionsInNew: number;
@@ -302,8 +282,6 @@ export interface DiffResult {
   order: DiffId[];
   sections: Section[];
   scope: CheckScope;
-  /** Formatting differences of paired content (decision 44). Absent for mock data. */
-  formatChanges?: FormatChange[];
   /** Notes, headers, footers, text boxes, links, pictures, properties, comments (decisions 45–46). Absent for mock data. */
   otherParts?: OtherParts;
 }

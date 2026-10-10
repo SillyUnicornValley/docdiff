@@ -4,7 +4,6 @@
 import type {
   Block,
   FieldType,
-  FormatProps,
   Inline,
   InlinePlaceholder,
   InlinePlaceholderKind,
@@ -22,7 +21,6 @@ import type {
 import { hashString } from '../hash';
 import type { Relationship } from './package';
 import type { NumberingState } from './numbering';
-import type { FormatResolver } from './formatting';
 import type { StyleMap } from './styles';
 import { elementChildren, isW, NS, onOff, plainText, wAttr, wChild, wChildren, wVal } from './xml';
 
@@ -40,8 +38,6 @@ export interface BodyContext {
   comments: Map<string, { author: string; preview: string }>;
   /** Media fingerprints by part path. */
   media: Map<string, string>;
-  /** Effective formatting, for the formatting check (decision 44). */
-  formats?: FormatResolver;
   /** Id prefix for content read outside the body (notes, headers…), so ids stay unique. */
   idPrefix?: string;
 }
@@ -62,8 +58,6 @@ export interface BodyResult {
    * "Use old" (spec/export §2).
    */
   groups: Map<NodeId, string[]>;
-  /** Distinct character formats (ParagraphFormat.runs index into this). */
-  runFormats: FormatProps[];
   /** Footnote and endnote ids in order of first reference (decision 45). */
   noteRefs: { footnotes: string[]; endnotes: string[] };
   /** Text box contents (w:txbxContent) in body order. */
@@ -117,53 +111,12 @@ const cleanMarks = (m: RunMarks): RunMarks | undefined => {
   return Object.keys(out).length ? out : undefined;
 };
 
-/**
- * Character format of each piece of a text inline, as [length, format index]
- * pairs. Kept beside the inline, not in it: formatting must not split text
- * (a word half in bold is still one word for the comparison, acceptance 1).
- */
-const formatChunks = new WeakMap<TextInline, number[]>();
-
 /** Append text, merging with the previous text inline when the marks match (split runs become one). */
-function pushText(target: Inline[] | TextInline[], text: string, marks?: RunMarks, fmt = -1) {
+function pushText(target: Inline[] | TextInline[], text: string, marks?: RunMarks) {
   if (!text) return;
   const last = target.at(-1);
-  let t: TextInline;
-  if (last?.type === 'text' && sameMarks(last.marks, marks)) {
-    last.text += text;
-    t = last;
-  } else {
-    t = marks ? { type: 'text', text, marks } : { type: 'text', text };
-    (target as Inline[]).push(t);
-  }
-  const c = formatChunks.get(t);
-  if (c) c.push(text.length, fmt);
-  else formatChunks.set(t, [text.length, fmt]);
-}
-
-/** Character format ranges of a paragraph over its flattened text (same walk as flattenInlines). */
-function formatRuns(content: Inline[]): [number, number, number][] {
-  const runs: [number, number, number][] = [];
-  let pos = 0;
-  const text = (t: TextInline) => {
-    const c = formatChunks.get(t) ?? [t.text.length, -1];
-    for (let i = 0; i < c.length; i += 2) {
-      const [len, f] = [c[i], c[i + 1]];
-      const last = runs.at(-1);
-      if (f >= 0) {
-        if (last && last[1] === pos && last[2] === f) last[1] = pos + len;
-        else runs.push([pos, pos + len, f]);
-      }
-      pos += len;
-    }
-  };
-  for (const i of content) {
-    if (i.type === 'text') text(i);
-    else if (i.type === 'hyperlink') i.content.forEach(text);
-    else if (i.type === 'field') i.result.forEach(text);
-    else if (i.type !== 'comment') pos += 1;
-  }
-  return runs;
+  if (last?.type === 'text' && sameMarks(last.marks, marks)) last.text += text;
+  else (target as Inline[]).push(marks ? { type: 'text', text, marks } : { type: 'text', text });
 }
 
 export class BodyReader {
@@ -176,11 +129,7 @@ export class BodyReader {
   private commentsSeen = new Set<string>();
   private out: Inline[] = [];
   private groupNo = 0;
-  /** Format index of the run being read, and the style of its paragraph (decision 44). */
-  private curFmt = -1;
-  private curPStyle: string | null = null;
-  private fmtIndex = new Map<string, number>();
-  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map(), runFormats: [], noteRefs: { footnotes: [], endnotes: [] }, textBoxElements: [], commentBlocks: new Map() };
+  readonly result: BodyResult = { blocks: [], source: new Map(), sectionBreaks: [], hyperlinkTargets: [], textBoxTexts: [], groups: new Map(), noteRefs: { footnotes: [], endnotes: [] }, textBoxElements: [], commentBlocks: new Map() };
   private curBlockId: NodeId | undefined;
 
   constructor(private ctx: BodyContext) {}
@@ -298,8 +247,6 @@ export class BodyReader {
     if (numbering) block.numbering = numbering;
     this.curBlockId = block.id;
     this.out = block.content;
-    const pPr = wChild(p, 'pPr');
-    this.curPStyle = wVal(pPr, 'pStyle');
     const spanning = () => (this.fields[0] && this.fields[0].kind !== 'toc' && fieldKeyword(this.fields[0].instr) !== 'TOC' ? this.fields[0].group : undefined);
     const atStart = spanning();
     this.inlines(p, {});
@@ -311,7 +258,6 @@ export class BodyReader {
       this.emitField(outer);
       outer.result = [];
     }
-    if (this.ctx.formats) block.format = { para: this.ctx.formats.paragraph(pPr), runs: formatRuns(block.content) };
     return block;
   }
 
@@ -323,8 +269,8 @@ export class BodyReader {
   private emitText(text: string, marks?: RunMarks) {
     if (this.fields.some((f) => f.phase === 'instr')) return;
     const outer = this.fields[0];
-    if (outer && outer.kind !== 'toc') pushText(outer.result, text, marks, this.curFmt);
-    else pushText(this.out, text, marks, this.curFmt);
+    if (outer && outer.kind !== 'toc') pushText(outer.result, text, marks);
+    else pushText(this.out, text, marks);
   }
 
   private emitInline(inl: Inline) {
@@ -455,22 +401,9 @@ export class BodyReader {
     return cleanMarks(m) ?? {};
   }
 
-  private runFormat(r: Element): number {
-    if (!this.ctx.formats) return -1;
-    const props = this.ctx.formats.run(wChild(r, 'rPr'), this.curPStyle);
-    const key = JSON.stringify(props);
-    let k = this.fmtIndex.get(key);
-    if (k === undefined) {
-      k = this.result.runFormats.push(props) - 1;
-      this.fmtIndex.set(key, k);
-    }
-    return k;
-  }
-
   private run(r: Element) {
     const marks = this.runMarks(r);
     const mk = Object.keys(marks).length ? marks : undefined;
-    this.curFmt = this.runFormat(r);
     for (const c of elementChildren(r)) {
       if (c.namespaceURI === NS.mc && c.localName === 'AlternateContent') {
         const choice = c.getElementsByTagNameNS(NS.mc, 'Choice')[0];
@@ -604,7 +537,6 @@ export class BodyReader {
   private table(tbl: Element): TableBlock {
     const widths = wChildren(wChild(tbl, 'tblGrid') ?? tbl, 'gridCol').map((g) => Number(wAttr(g, 'w') ?? 0));
     const t: TableBlock = { kind: 'table', id: this.id('t'), gridColumns: widths.length, rows: [] };
-    if (this.ctx.formats) t.style = this.ctx.formats.table(wChild(tbl, 'tblPr'));
     if (widths.length && widths.every((w) => w > 0)) t.columnWidths = widths;
     this.result.source.set(t.id, tbl);
     const rows = (el: Element): Element[] =>

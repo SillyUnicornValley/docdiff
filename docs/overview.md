@@ -2,7 +2,7 @@
 
 > 这是项目的总入口，只做概括和链接。现行规则在 `spec/`，决定索引在 `decisions.md`。
 > **每完成一个阶段或做出新决定，更新本文件的「状态」部分。**
-> 最后更新：2026-10-10（v0.5.0）
+> 最后更新：2026-10-10（v0.5.1）
 
 ---
 
@@ -13,7 +13,7 @@
 - 像 VS Code 的左右 diff 一样并排看旧版和新版，差异高亮。
 - 每一处差异选「采用旧版」或「采用新版」，最后导出合并好的 Word 文件。
 - 所有处理都在浏览器本地完成，文件不离开电脑。可以发布到 Posit Connect，也可以作为单个 HTML 文件离线使用。
-- 先做英文文档的正文和表格内容比较；格式、页眉页脚、脚注、批注等只提示（Stage 5）；Excel 以后再做。
+- 先做英文文档的正文和表格内容比较；页眉页脚、脚注、批注等只提示（Stage 5）；格式检查以后单独做（决定 47）；Excel 以后再做。
 
 详见 [spec/scope.md](spec/scope.md)。
 
@@ -24,7 +24,7 @@
 | 原则 | 含义 | 出处 |
 |---|---|---|
 | 先接受已有修订 | 上传的文件如果带 Track Changes，先按「全部接受」处理，再比较 | [reading](spec/reading.md)，决定 22 |
-| 内容与格式分开 | 字体、加粗、run 拆分（Word 内部的文字切法，见 comparison §1）不同不算内容差异；上下标、隐藏文字算内容。格式另做检查，只提示 | [comparison §1、§9](spec/comparison.md)，决定 44 |
+| 内容与格式分开 | 字体、加粗、run 拆分（Word 内部的文字切法，见 comparison §1）不同不算内容差异；上下标、隐藏文字算内容。格式检查暂缓，以后内容、格式各出一套结果 | [comparison §1、§9](spec/comparison.md)，决定 47 |
 | 默认结果 = 新版 | 没有选择的差异按新版处理；全部采用新版时，导出等于接受修订后的新版 | [merge §1](spec/merge.md) |
 | 以新版为底稿 | 导出时在新版文件上修改，只改用户选了旧版的地方，其余保持原样 | [export](spec/export.md) |
 | 不确定就不做 | 能安全复制进新版的（脚注、超链接、域、图片、公式）才能带回；图表、文本框、嵌入对象、跨段的域和内容控件等不提供「采用旧版」 | [merge §3](spec/merge.md)，决定 15、43 |
@@ -52,7 +52,7 @@
 | 解析 .docx | `src/engine/docx/` | [stage2-design](implementation/stage2-design.md) §2 |
 | 对齐与比较 | `src/engine/align/`、`src/engine/compare/` | [stage2-design](implementation/stage2-design.md) §3–§4 |
 | 导出与自检 | `src/engine/export/` | [stage3-design](implementation/stage3-design.md)、[stage5-design](implementation/stage5-design.md) §3 |
-| 格式检查、其他部分比较 | `src/engine/compare/formatting.ts`、`otherParts.ts` | [stage5-design](implementation/stage5-design.md) §4–§6 |
+| 其他部分比较 | `src/engine/compare/otherParts.ts` | [stage5-design](implementation/stage5-design.md) §5–§6 |
 | 界面 | `src/ui/`（React，长文档用虚拟滚动） | [spec/ui.md](spec/ui.md) |
 | 打包 | Vite + singlefile → `dist/index.html` 单文件 | — |
 
@@ -72,7 +72,7 @@
 | 2 | 主体内容比较（解析、对齐、移动识别、词级差异） | ✅ 完成（M1–M6） | v0.2.0 | [stage2-design](implementation/stage2-design.md) |
 | 3 | 合并与 Clean 导出（结构保护、撤销、进度、自检） | ✅ 完成 | v0.3.0；v0.3.1 说明改为浮窗（决定 40） | [stage3-design](implementation/stage3-design.md) |
 | 4 | Track Changes 导出 | ⏸ 暂缓（决定 39） | — | [export §3](spec/export.md) |
-| 5 | 扩展检查（段内逐处选择、带回脚注等、格式、其他部分、批注） | ✅ 完成（M1–M5） | v0.5.0 | [stage5-design](implementation/stage5-design.md) |
+| 5 | 扩展检查（段内逐处选择、带回脚注等、其他部分、批注） | ✅ 完成（M1、M2、M4、M5；M3 格式检查撤回，决定 47） | v0.5.0；v0.5.1 撤回格式检查 | [stage5-design](implementation/stage5-design.md) |
 | 6 | Excel | ⬜ 未开始 | — | — |
 
 ### 4.2 验收标准（全文见 [scope §5](spec/scope.md)）
@@ -109,16 +109,16 @@
 - [x] 差异颗粒度 G1–G12：已全部确认（决定 35、36，[comparison §2.2](spec/comparison.md)）
 
 **已知限制**（[stage3-design](implementation/stage3-design.md) §9、[stage5-design](implementation/stage5-design.md) §8）
-- 格式、页眉页脚、脚注文字、批注只提示，不能选择旧版（决定 41）
+- 格式不检查（决定 47）；页眉页脚、脚注文字、批注只提示，不能选择旧版（决定 41）
 - 修改段落含脚注、链接等元素时整段替换内容，这段中没变的字也换成旧版的文字格式（决定 43）
-- 格式检查不计表格样式的条件格式和列表级别自带的缩进
 - 带回的列表项找不到相邻列表、旧列表定义在新版中又不存在时，会丢失编号
 - 复制的旧版表格引用了新版没有的表格样式时，只保留直接设置的边框和底纹
 
 **后续阶段**
 - [ ] Stage 4：Track Changes 导出（暂缓，决定 39；导出的修改计划已为它预留，见 [export §3](spec/export.md)）
-- [x] Stage 5：格式检查（含列表类型）、未比较元素逐项比较、带回含脚注等元素的旧版内容、段内词级选择、批注处理（v0.5.0，决定 41–46）
-- [ ] Stage 5 后续（按需要）：把格式、页眉页脚、脚注文字等做成可以选择旧版的差异
+- [x] Stage 5：未比较元素逐项比较、带回含脚注等元素的旧版内容、段内词级选择、批注处理（v0.5.0，决定 41–46）
+- [ ] 格式检查：撤回（v0.5.1，决定 47），以后单独讨论后再做。设想：内容、格式各出一套结果，可只看内容、只看格式或同时显示
+- [ ] Stage 5 后续（按需要）：把页眉页脚、脚注文字等做成可以选择旧版的差异
 - [ ] Stage 6：Excel
 
 **仓库整理**
@@ -140,7 +140,7 @@
 | 做过哪些决定（按编号） | [decisions.md](decisions.md) |
 | 支持哪些文件、哪些修订类型 | [spec/reading.md](spec/reading.md) §1、§4 |
 | 每种 Word 元素是比较、只检测还是只显示 | [spec/comparison.md](spec/comparison.md) §8 |
-| 格式检查比较什么 | [spec/comparison.md](spec/comparison.md) §9 |
+| 格式检查为什么暂缓、以后怎么做 | [spec/comparison.md](spec/comparison.md) §9、决定 47 |
 | Stage 5 的技术设计 | [implementation/stage5-design.md](implementation/stage5-design.md) |
 | 引擎的技术设计 | [implementation/stage2-design.md](implementation/stage2-design.md) |
 | 导出的技术设计与测试 | [implementation/stage3-design.md](implementation/stage3-design.md) |

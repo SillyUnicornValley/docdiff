@@ -3,13 +3,12 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Block, CommentInline, InlinePlaceholder, ParagraphBlock, PlaceholderBlock, Side, TableBlock, TableCell, TableRow } from '../model/document';
-import type { DiffResult, Difference, FormatChange, RowSegment, Segment } from '../model/diff';
+import type { DiffResult, Difference, RowSegment, Segment } from '../model/diff';
 import { flattenParagraph, type Piece, type PieceWrap } from '../model/flatten';
 import type { StructureChange } from '../model/hints';
 import type { Selection } from '../model/review';
 import { hunkChoice, isHunkSelection } from '../model/selection';
 import { Tip } from './kit';
-import { FormatItemsTable } from './FormattingTab';
 import { isHidden, type Indexes, type SectionMarker, type SectionMarkers, type Visibility } from './rows';
 
 // ---------------------------------------------------------------------------
@@ -25,7 +24,7 @@ export interface ViewCtx {
   onSelectDiff?: (id: string) => void;
   sections: SectionMarkers;
   /** Heading level and numbering changes by old and new paragraph id (decisions 37–38). */
-  hints: { levels: Map<string, StructureChange>; numbering: Map<string, StructureChange>; formats: Map<string, FormatChange> };
+  hints: { levels: Map<string, StructureChange>; numbering: Map<string, StructureChange> };
   /** Row briefly highlighted after "Show in document". */
   flashKey?: string;
 }
@@ -199,7 +198,6 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
   const { vis, sections, hints } = useView();
   const level = hints.levels.get(p.id);
   const num = vis.showNumbering ? hints.numbering.get(p.id) : undefined;
-  const fmt = vis.showFormatting ? hints.formats.get(p.id) : undefined;
   const { pieces, text } = flattenParagraph(p);
   const other = placeholderFingerprints(counterpart);
   let phIndex = 0;
@@ -280,7 +278,6 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
           </span>
         </Tip>
       )}
-      {fmt && <FormatMark c={fmt} />}
       {p.sectionBreak && (
         <Tip icon={false} tip="This paragraph carries a section break. If it is removed, the break moves to the neighbouring paragraph.">
           <span className="section-break">⸺ Section break ⸺</span>
@@ -288,26 +285,6 @@ export function Paragraph({ p, hl, counterpart }: { p: ParagraphBlock; hl?: Hl[]
       )}
       {p.sectionBreak && sections.afterBreak.get(p.id) && <SectionMarkerView m={sections.afterBreak.get(p.id)!} />}
     </div>
-  );
-}
-
-/** "Aa" next to a paragraph or table whose formatting differs (decision 44). */
-export function FormatMark({ c }: { c: FormatChange }) {
-  return (
-    <Tip
-      icon={false}
-      className="fmt-tip"
-      tip={
-        <>
-          <b>Formatting differs</b> (shown only; the export keeps the new formatting)
-          <FormatItemsTable items={c.items} />
-        </>
-      }
-    >
-      <span className="fmt-mark" aria-label={`Formatting differs: ${c.items.map((i) => i.property).join(', ')}`}>
-        Aa <span className="fmt-mark-n">{c.items.length}</span>
-      </span>
-    </Tip>
   );
 }
 
@@ -355,27 +332,10 @@ function TocBlock({ b, hl, forceOpen }: { b: PlaceholderBlock; hl?: HlMap; force
   );
 }
 
-/** Table style change marker above a table (decision 44). */
-export function TableFormatMark({ id }: { id: string }) {
-  const { vis, hints } = useView();
-  const c = vis.showFormatting ? hints.formats.get(id) : undefined;
-  return c ? (
-    <div className="table-fmt">
-      <FormatMark c={c} />
-    </div>
-  ) : null;
-}
-
 export function BlockView({ b, hl, counterpart }: { b: Block; hl?: HlMap; counterpart?: Block }) {
   const { vis } = useView();
   if (b.kind === 'paragraph') return <Paragraph p={b} hl={hl?.get(b.id)} counterpart={counterpart?.kind === 'paragraph' ? counterpart : undefined} />;
-  if (b.kind === 'table')
-    return (
-      <>
-        <TableFormatMark id={b.id} />
-        <WholeTable t={b} hl={hl} />
-      </>
-    );
+  if (b.kind === 'table') return <WholeTable t={b} hl={hl} />;
   if (b.element === 'toc') return <TocBlock b={b} hl={hl} forceOpen={vis.compareToc && !!hl} />;
   const mayDiffer = counterpart?.kind === 'placeholder' && counterpart.fingerprint !== b.fingerprint;
   return (
@@ -440,23 +400,20 @@ export function TableFragment({
   className?: string;
 }) {
   return (
-    <>
-      {first && <TableFormatMark id={t.id} />}
-      <table className={`doc-table frag${first ? ' frag-first' : ''}${className ? ` ${className}` : ''}`}>
-        <Colgroup t={t} />
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              {r.cells.map((c, ci) => (
-                <td key={c.id} colSpan={c.gridSpan} className={cellClass(c, r.isHeader)}>
-                  {c.vMerge === 'continue' ? null : cellContent(r, c, ci)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </>
+    <table className={`doc-table frag${first ? ' frag-first' : ''}${className ? ` ${className}` : ''}`}>
+      <Colgroup t={t} />
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id}>
+            {r.cells.map((c, ci) => (
+              <td key={c.id} colSpan={c.gridSpan} className={cellClass(c, r.isHeader)}>
+                {c.vMerge === 'continue' ? null : cellContent(r, c, ci)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
