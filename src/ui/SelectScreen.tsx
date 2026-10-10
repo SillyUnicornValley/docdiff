@@ -105,7 +105,7 @@ export function SelectScreen({
         <div className="brand">
           docdiff{' '}
           <span className="ver">
-            v{APP_VERSION} · prototype · built {BUILD_DATE}
+            v{APP_VERSION} · pre-release · built {BUILD_DATE}
           </span>
         </div>
       </header>
@@ -141,19 +141,32 @@ export function SelectScreen({
         </div>
 
         <details className="scope-summary">
-          <summary>What docdiff v1 compares</summary>
+          <summary>What docdiff compares</summary>
           <ul>
             <li>
-              <b>Compared:</b> body text and headings, list item text, table cell text and rows, superscript/subscript, hidden text, paragraph splits/joins and moves.
+              <Tip tip="Body text and headings, list item text, table cells and rows, superscript and subscript, hidden text, hyperlink text, and paragraph splits, joins and moves. Changes to table columns or merged cells are chosen for the whole table.">
+                <b>Compared, you choose old or new:</b> the main text and tables.
+              </Tip>
             </li>
             <li>
-              <b>Detected only</b> (“may differ”): headers and footers, footnote text, hyperlink addresses, images, document properties.
+              <Tip tip="Heading level changes are marked ⚑ and automatic numbering differences №. You cannot choose them: the export keeps the new levels, and Word recalculates the numbers.">
+                <b>Flagged only:</b> heading levels ⚑ and automatic numbering №.
+              </Tip>
             </li>
             <li>
-              <b>Shown, not compared:</b> automatic list numbers, table of contents and fields (optional), images, text boxes, equations.
+              <Tip tip="Footnotes and endnotes, headers and footers, text boxes and comments are compared item by item. Changed hyperlink addresses, pictures and document properties are listed. You cannot choose them: the export keeps the new version, and old comments are not added.">
+                <b>Other parts tab, shown only:</b> notes, headers and footers, text boxes, comments, link addresses, pictures, properties.
+              </Tip>
             </li>
             <li>
-              <b>Not checked:</b> formatting (fonts, styles, spacing, heading levels…). Comments are not compared.
+              <Tip tip="The table of contents and date or page fields are shown and can be compared from View options. Charts, shapes, SmartArt, equations and embedded objects appear as placeholders.">
+                <b>Shown, not compared:</b> fields and the table of contents, charts, shapes, equations.
+              </Tip>
+            </li>
+            <li>
+              <Tip tip="Fonts, sizes, colours, bold and italic, spacing, alignment, styles, list and table styles, and page setup. A change that is only formatting shows no difference; the export keeps the new file's formatting. Use Word's own Compare if formatting matters.">
+                <b>Not checked:</b> formatting and page setup.
+              </Tip>
             </li>
           </ul>
         </details>

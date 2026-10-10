@@ -357,7 +357,7 @@ export function CompareView({
         <div className="app compare">
           <header className="topbar">
             <div className="brand">
-              docdiff <span className="ver">v{APP_VERSION} · prototype</span>
+              docdiff <span className="ver">v{APP_VERSION} · pre-release</span>
             </div>
             <div className="files" title="Old (left) → New (right)">
               <span className="file old">− {result.old.fileName}</span>
